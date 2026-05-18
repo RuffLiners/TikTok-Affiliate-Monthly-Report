@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { Session } from '@supabase/supabase-js'
-import Login from './Login'
 
-// AUDIT: onDone lets the parent dismiss this screen after a successful password set
-// (needed for invite flow where the user is already signed in).
 function SetNewPassword({ onDone }: { onDone?: () => void }) {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -69,8 +66,6 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   const [timedOut, setTimedOut] = useState(false)
 
   useEffect(() => {
-    // AUDIT: detect invite links (?type=invite or #type=invite) so new users are
-    // prompted to set a password immediately after clicking their invite email link.
     const hashParams = new URLSearchParams(window.location.hash.slice(1))
     const searchParams = new URLSearchParams(window.location.search)
     const urlType = hashParams.get('type') || searchParams.get('type')
@@ -78,7 +73,6 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       setRecoveryMode(true)
     }
 
-    // If Supabase doesn't respond in 30s (e.g. project paused), stop spinning
     const timeout = setTimeout(() => {
       setTimedOut(true)
       setLoading(false)
@@ -133,6 +127,6 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   }
 
   if (recoveryMode) return <SetNewPassword onDone={() => setRecoveryMode(false)} />
-  if (!session) return <Login />
+  // Public access: always render children; auth state is managed inside the app
   return <>{children}</>
 }
