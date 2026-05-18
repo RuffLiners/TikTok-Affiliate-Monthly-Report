@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabaseClient";
@@ -57,6 +57,22 @@ interface EditDraft {
   videoLength: string;
   sellingPoints: string;
   keyIdea: string;
+}
+
+interface VideoCardProps {
+  r: VideoRow;
+  showFilter: boolean;
+  hiddenIds: Set<string>;
+  editingId: string | null;
+  editDraft: EditDraft;
+  adminMode: boolean;
+  transcriptOpen: Set<string>;
+  toggleHide: (videoId: string) => void;
+  cancelEdit: () => void;
+  openEdit: (r: VideoRow) => void;
+  saveEdit: (r: VideoRow) => void;
+  setEditDraft: React.Dispatch<React.SetStateAction<EditDraft>>;
+  toggleTranscript: (id: string) => void;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -140,6 +156,192 @@ const UP_TYPES = [
   {value:"lastmonth", label:"Last Month Report  →  feeds Last Month tab + monthly creator stats"},
   {value:"inhouse",   label:"In-House Content Report"},
 ];
+
+// ─── VIDEO CARD ───────────────────────────────────────────────────────────────
+// Defined at module level so React never remounts it on parent re-renders.
+
+function VideoCard({ r, showFilter, hiddenIds, editingId, editDraft, adminMode, transcriptOpen,
+  toggleHide, cancelEdit, openEdit, saveEdit, setEditDraft, toggleTranscript }: VideoCardProps) {
+  const sellPts  = pts(r.sellingPoints).map(lbl);
+  const tags     = (r.hashtags||"").split(" ").filter(Boolean);
+  const hidden   = hiddenIds.has(r.videoId);
+  const isEditing = editingId === r.id;
+  const shortProduct = (r.product||"")
+    .replace("for Dogs with Door Protection","")
+    .replace("for Full-Size Crew Cab Trucks with Fold Up Seats","")
+    .trim();
+
+  const hookRows: [string,string,string][] = [
+    ["🎵","Audio Hook", r.audioHook ? hks(r.audioHook).map(lbl).join(" · ") : ""],
+    ["🎬","Visual Hook", r.visualHook||""],
+    ["🎣","Text Hook",   r.textHook||""],
+  ].filter(([,,v]) => v) as [string,string,string][];
+
+  return (
+    <div style={{display:"flex",background:"#fff",borderRadius:14,overflow:"hidden",
+      boxShadow:"0 1px 3px rgba(0,0,0,0.07)",
+      border:`1px solid ${hidden&&adminMode?"#fca5a5":"#e5e7eb"}`,
+      marginBottom:16, opacity:hidden&&adminMode?0.55:1}}>
+
+      <div style={{flexShrink:0,width:325,background:"#0a0a0a"}}>
+        {r.videoId ? (
+          <div style={{width:325,height:578,overflow:"hidden",flexShrink:0}}>
+            <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
+              style={{display:"block",width:325,height:738,border:"none"}}
+              allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
+          </div>
+        ) : (
+          <div style={{width:325,height:578,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
+            <span style={{fontSize:24}}>📹</span>No embed
+          </div>
+        )}
+      </div>
+
+      <div style={{flex:1,padding:"16px 20px",overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:10}}>
+
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
+            <div style={{background:"#111",color:"#fff",borderRadius:7,minWidth:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>#{r.rank}</div>
+            <div style={{minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:14,color:"#111"}}>@{r.creator}</div>
+              <div style={{fontSize:11,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{shortProduct} · {r.datePosted}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontWeight:800,fontSize:22,color:"#16a34a",lineHeight:1}}>{f$(r.revenue)}</div>
+              <div style={{fontSize:11,color:"#9ca3af"}}>{fN(r.itemsSold)} sold</div>
+            </div>
+            {showFilter && (
+              <button onClick={()=>toggleHide(r.videoId)}
+                style={{padding:"4px 9px",borderRadius:7,border:"1px solid",borderColor:hidden?"#fca5a5":"#d1d5db",background:hidden?"#fff5f5":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,color:hidden?"#dc2626":"#6b7280"}}>
+                {hidden?"🚫":"👁"}
+              </button>
+            )}
+            {adminMode && (
+              <button onClick={()=>isEditing?cancelEdit():openEdit(r)}
+                style={{padding:"5px 12px",borderRadius:7,border:"1px solid",borderColor:isEditing?"#3b82f6":"#d1d5db",background:isEditing?"#eff6ff":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,color:isEditing?"#2563eb":"#374151"}}>
+                {isEditing?"✕ Close":"✏️ Edit"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {isEditing && (
+          <div style={{background:"#f8faff",border:"1px solid #bfdbfe",borderRadius:10,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#2563eb",textTransform:"uppercase",letterSpacing:"0.07em"}}>Edit Fields</div>
+            {(
+              [
+                ["audioHook",   "🎵 Audio Hook",   "textarea"],
+                ["visualHook",  "🎬 Visual Hook",  "textarea"],
+                ["textHook",    "🎣 Text Hook",    "textarea"],
+                ["videoLength", "⏱ Video Length",  "input"  ],
+                ["keyIdea",     "💡 Key Idea",      "textarea"],
+              ] as [keyof EditDraft, string, string][]
+            ).map(([field, label, type]) => (
+              <div key={field}>
+                <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>{label}</div>
+                {type==="input" ? (
+                  <input value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))}
+                    style={{width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                ) : (
+                  <textarea value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))} rows={2}
+                    style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.5}}/>
+                )}
+              </div>
+            ))}
+            <div>
+              <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>✅ Selling Points <span style={{fontWeight:400,color:"#9ca3af"}}>— one per line</span></div>
+              <textarea value={editDraft.sellingPoints||""} onChange={e=>setEditDraft(d=>({...d,sellingPoints:e.target.value}))} rows={3}
+                style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.6}}/>
+            </div>
+            <button onClick={()=>saveEdit(r)}
+              style={{alignSelf:"flex-start",padding:"7px 20px",background:"#111",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
+              💾 Save Changes
+            </button>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:18,padding:"8px 0",borderTop:"1px solid #f3f4f6",borderBottom:"1px solid #f3f4f6"}}>
+          {[["👁","Views",fK(r.views)],["❤️","Likes",fK(r.likes)],["💬","Comments",fK(r.comments)]].map(([ic,lb,v])=>(
+            <div key={lb as string}>
+              <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic} {lb}</div>
+              <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {r.product && (
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <span style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",flexShrink:0}}>🛍</span>
+            <span style={{fontSize:11,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 10px",fontWeight:500}}>{r.product}</span>
+          </div>
+        )}
+
+        {(r.description || tags.length > 0) && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>📝 Description</div>
+            <div style={{fontSize:12,lineHeight:1.6}}>
+              {r.description && <span style={{color:"#4b5563",fontStyle:"italic"}}>"{ r.description}" </span>}
+              {tags.map(t=><span key={t} style={{color:"#2563eb",fontWeight:500,marginRight:4}}>{t}</span>)}
+            </div>
+          </div>
+        )}
+
+        {hookRows.length>0 && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>Hooks</div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              {hookRows.map(([ic,lb,val])=>(
+                <div key={lb} style={{display:"flex",gap:7,alignItems:"flex-start",fontSize:12}}>
+                  <span style={{flexShrink:0,width:14,textAlign:"center"}}>{ic}</span>
+                  <span style={{color:"#6b7280",flexShrink:0,fontWeight:600}}>{lb}:</span>
+                  <span style={{color:"#111",lineHeight:1.45}}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {r.keyIdea && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>💡 Key Idea</div>
+            <div style={{fontSize:12,color:"#374151",lineHeight:1.5,background:"#fefce8",border:"1px solid #fef08a",borderRadius:7,padding:"7px 11px"}}>{r.keyIdea}</div>
+          </div>
+        )}
+
+        {sellPts.length>0 && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>✅ Selling Points</div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>
+              {sellPts.map((p,i)=>(
+                <div key={i} style={{display:"flex",gap:7,alignItems:"flex-start"}}>
+                  <span style={{color:"#16a34a",flexShrink:0,fontWeight:700}}>✓</span>
+                  <span style={{fontSize:12,color:"#374151",lineHeight:1.45}}>{p}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {r.transcript && (
+          <div>
+            <button onClick={()=>toggleTranscript(r.id)}
+              style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#374151",background:"none",border:"1px solid #d1d5db",borderRadius:6,padding:"4px 11px",cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>
+              📄 {transcriptOpen.has(r.id)?"Hide Transcript":"View Transcript"}
+            </button>
+            {transcriptOpen.has(r.id) && (
+              <div style={{marginTop:8,background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,padding:"12px 14px",maxHeight:260,overflowY:"auto"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Transcript</div>
+                <div style={{fontSize:12,color:"#374151",lineHeight:1.75,whiteSpace:"pre-wrap"}}>{r.transcript}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
@@ -545,190 +747,6 @@ export default function TikTokShopReporter() {
     });
   };
 
-  // ── sub-components ────────────────────────────────────────────────────────────
-
-  const VideoCard = ({r, showFilter}: {r: VideoRow; showFilter: boolean}) => {
-    const sellPts  = pts(r.sellingPoints).map(lbl);
-    const tags     = (r.hashtags||"").split(" ").filter(Boolean);
-    const hidden   = hiddenIds.has(r.videoId);
-    const isEditing = editingId === r.id;
-    const shortProduct = (r.product||"")
-      .replace("for Dogs with Door Protection","")
-      .replace("for Full-Size Crew Cab Trucks with Fold Up Seats","")
-      .trim();
-
-    const hookRows: [string,string,string][] = [
-      ["🎵","Audio Hook", r.audioHook ? hks(r.audioHook).map(lbl).join(" · ") : ""],
-      ["🎬","Visual Hook", r.visualHook||""],
-      ["🎣","Text Hook",   r.textHook||""],
-    ].filter(([,,v]) => v) as [string,string,string][];
-
-    return (
-      <div style={{display:"flex",background:"#fff",borderRadius:14,overflow:"hidden",
-        boxShadow:"0 1px 3px rgba(0,0,0,0.07)",
-        border:`1px solid ${hidden&&adminMode?"#fca5a5":"#e5e7eb"}`,
-        marginBottom:16, opacity:hidden&&adminMode?0.55:1}}>
-
-        <div style={{flexShrink:0,width:325,background:"#0a0a0a"}}>
-          {r.videoId ? (
-            <div style={{width:325,height:578,overflow:"hidden",flexShrink:0}}>
-              <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
-                style={{display:"block",width:325,height:738,border:"none"}}
-                allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
-            </div>
-          ) : (
-            <div style={{width:325,height:578,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
-              <span style={{fontSize:24}}>📹</span>No embed
-            </div>
-          )}
-        </div>
-
-        <div style={{flex:1,padding:"16px 20px",overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:10}}>
-
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
-            <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
-              <div style={{background:"#111",color:"#fff",borderRadius:7,minWidth:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>#{r.rank}</div>
-              <div style={{minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:14,color:"#111"}}>@{r.creator}</div>
-                <div style={{fontSize:11,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{shortProduct} · {r.datePosted}</div>
-              </div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontWeight:800,fontSize:22,color:"#16a34a",lineHeight:1}}>{f$(r.revenue)}</div>
-                <div style={{fontSize:11,color:"#9ca3af"}}>{fN(r.itemsSold)} sold</div>
-              </div>
-              {showFilter && (
-                <button onClick={()=>toggleHide(r.videoId)}
-                  style={{padding:"4px 9px",borderRadius:7,border:"1px solid",borderColor:hidden?"#fca5a5":"#d1d5db",background:hidden?"#fff5f5":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,color:hidden?"#dc2626":"#6b7280"}}>
-                  {hidden?"🚫":"👁"}
-                </button>
-              )}
-              {adminMode && (
-                <button onClick={()=>isEditing?cancelEdit():openEdit(r)}
-                  style={{padding:"5px 12px",borderRadius:7,border:"1px solid",borderColor:isEditing?"#3b82f6":"#d1d5db",background:isEditing?"#eff6ff":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,color:isEditing?"#2563eb":"#374151"}}>
-                  {isEditing?"✕ Close":"✏️ Edit"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {isEditing && (
-            <div style={{background:"#f8faff",border:"1px solid #bfdbfe",borderRadius:10,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#2563eb",textTransform:"uppercase",letterSpacing:"0.07em"}}>Edit Fields</div>
-              {(
-                [
-                  ["audioHook",   "🎵 Audio Hook",   "textarea"],
-                  ["visualHook",  "🎬 Visual Hook",  "textarea"],
-                  ["textHook",    "🎣 Text Hook",    "textarea"],
-                  ["videoLength", "⏱ Video Length",  "input"  ],
-                  ["keyIdea",     "💡 Key Idea",      "textarea"],
-                ] as [keyof EditDraft, string, string][]
-              ).map(([field, label, type]) => (
-                <div key={field}>
-                  <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>{label}</div>
-                  {type==="input" ? (
-                    <input value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))}
-                      style={{width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,boxSizing:"border-box",outline:"none"}}/>
-                  ) : (
-                    <textarea value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))} rows={2}
-                      style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.5}}/>
-                  )}
-                </div>
-              ))}
-              <div>
-                <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>✅ Selling Points <span style={{fontWeight:400,color:"#9ca3af"}}>— one per line</span></div>
-                <textarea value={editDraft.sellingPoints||""} onChange={e=>setEditDraft(d=>({...d,sellingPoints:e.target.value}))} rows={3}
-                  style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.6}}/>
-              </div>
-              <button onClick={()=>saveEdit(r)}
-                style={{alignSelf:"flex-start",padding:"7px 20px",background:"#111",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
-                💾 Save Changes
-              </button>
-            </div>
-          )}
-
-          <div style={{display:"flex",gap:18,padding:"8px 0",borderTop:"1px solid #f3f4f6",borderBottom:"1px solid #f3f4f6"}}>
-            {[["👁","Views",fK(r.views)],["❤️","Likes",fK(r.likes)],["💬","Comments",fK(r.comments)]].map(([ic,lb,v])=>(
-              <div key={lb as string}>
-                <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic} {lb}</div>
-                <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{v}</div>
-              </div>
-            ))}
-          </div>
-
-          {r.product && (
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",flexShrink:0}}>🛍</span>
-              <span style={{fontSize:11,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 10px",fontWeight:500}}>{r.product}</span>
-            </div>
-          )}
-
-          {(r.description || tags.length > 0) && (
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>📝 Description</div>
-              <div style={{fontSize:12,lineHeight:1.6}}>
-                {r.description && <span style={{color:"#4b5563",fontStyle:"italic"}}>"{ r.description}" </span>}
-                {tags.map(t=><span key={t} style={{color:"#2563eb",fontWeight:500,marginRight:4}}>{t}</span>)}
-              </div>
-            </div>
-          )}
-
-          {hookRows.length>0 && (
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>Hooks</div>
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {hookRows.map(([ic,lb,val])=>(
-                  <div key={lb} style={{display:"flex",gap:7,alignItems:"flex-start",fontSize:12}}>
-                    <span style={{flexShrink:0,width:14,textAlign:"center"}}>{ic}</span>
-                    <span style={{color:"#6b7280",flexShrink:0,fontWeight:600}}>{lb}:</span>
-                    <span style={{color:"#111",lineHeight:1.45}}>{val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {r.keyIdea && (
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>💡 Key Idea</div>
-              <div style={{fontSize:12,color:"#374151",lineHeight:1.5,background:"#fefce8",border:"1px solid #fef08a",borderRadius:7,padding:"7px 11px"}}>{r.keyIdea}</div>
-            </div>
-          )}
-
-          {sellPts.length>0 && (
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>✅ Selling Points</div>
-              <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                {sellPts.map((p,i)=>(
-                  <div key={i} style={{display:"flex",gap:7,alignItems:"flex-start"}}>
-                    <span style={{color:"#16a34a",flexShrink:0,fontWeight:700}}>✓</span>
-                    <span style={{fontSize:12,color:"#374151",lineHeight:1.45}}>{p}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {r.transcript && (
-            <div>
-              <button onClick={()=>toggleTranscript(r.id)}
-                style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:"#374151",background:"none",border:"1px solid #d1d5db",borderRadius:6,padding:"4px 11px",cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>
-                📄 {transcriptOpen.has(r.id)?"Hide Transcript":"View Transcript"}
-              </button>
-              {transcriptOpen.has(r.id) && (
-                <div style={{marginTop:8,background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,padding:"12px 14px",maxHeight:260,overflowY:"auto"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Transcript</div>
-                  <div style={{fontSize:12,color:"#374151",lineHeight:1.75,whiteSpace:"pre-wrap"}}>{r.transcript}</div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const CreatorCard = ({c, idx}: {c: CreatorSummary; idx: number}) => {
     const medals = ["🥇","🥈","🥉"];
     const STATS = [
@@ -819,6 +837,8 @@ export default function TikTokShopReporter() {
   const slicedAt = visAllTime.slice(0, pageAt);
   const slicedLm = filteredLastMonth.slice(0, pageLm);
   const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length};
+  const cardProps = { hiddenIds, editingId, editDraft, adminMode, transcriptOpen,
+    toggleHide, cancelEdit, openEdit, saveEdit, setEditDraft, toggleTranscript };
   const gmvAt = visAllTime.reduce((s,r)=>s+r.revenue,0);
   const gmvLm = filteredLastMonth.reduce((s,r)=>s+r.revenue,0);
 
@@ -1059,7 +1079,7 @@ export default function TikTokShopReporter() {
           visAllTime.length===0
             ? <Empty msg='Click "Update Reports" above and upload the All-Time export from app.euka.ai/videos'/>
             : <>
-                {slicedAt.map(r=><VideoCard key={r.id} r={r} showFilter={adminMode}/>)}
+                {slicedAt.map(r=><VideoCard key={r.id} r={r} showFilter={adminMode} {...cardProps}/>)}
                 {pageAt<visAllTime.length && (
                   <div style={{textAlign:"center",padding:"16px 0"}}>
                     <button onClick={()=>setPageAt(n=>n+20)}
@@ -1075,7 +1095,7 @@ export default function TikTokShopReporter() {
           filteredLastMonth.length===0
             ? <Empty msg='Click "Update Reports" above and upload the Last Month export from app.euka.ai/videos'/>
             : <>
-                {slicedLm.map(r=><VideoCard key={r.id} r={r} showFilter={false}/>)}
+                {slicedLm.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)}
                 {pageLm<filteredLastMonth.length && (
                   <div style={{textAlign:"center",padding:"16px 0"}}>
                     <button onClick={()=>setPageLm(n=>n+20)}
@@ -1090,7 +1110,7 @@ export default function TikTokShopReporter() {
         {tab==="inhouse" && (
           visInhouse.length===0
             ? <Empty msg="In-House Content report source TBD — upload when available"/>
-            : visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false}/>)
+            : visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)
         )}
 
         {tab==="creators" && (
