@@ -732,9 +732,9 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>
               🏆 Top {c.top3.length} Video{c.top3.length!==1?"s":""}
             </div>
-            <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(c.top3.length,3)},1fr)`,gap:16}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
               {c.top3.map((v,i)=>(
-                <div key={v.id||i} style={{minWidth:0}}>
+                <div key={v.id||i} style={{width:325,flexShrink:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                     <span style={{background:"#111",color:"#fff",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>
                       {["1st","2nd","3rd"][i]||`#${i+1}`}
@@ -744,13 +744,13 @@ export default function TikTokShopReporter() {
                     {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
                   </div>
                   {v.videoId ? (
-                    <div style={{overflow:"hidden",borderRadius:10,height:Math.round(260*(16/9))}}>
+                    <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
                       <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
-                        style={{display:"block",width:"100%",height:738,border:"none"}}
+                        style={{display:"block",width:325,height:738,border:"none"}}
                         allowFullScreen allow="encrypted-media" loading="lazy" title={`Top video ${i+1}`}/>
                     </div>
                   ) : (
-                    <div style={{height:200,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
+                    <div style={{width:325,height:578,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
                   )}
                   {v.product && (
                     <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
