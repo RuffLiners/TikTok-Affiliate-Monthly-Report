@@ -64,14 +64,12 @@ interface VideoCardProps {
   showFilter: boolean;
   hiddenIds: Set<string>;
   editingId: string | null;
-  editDraft: EditDraft;
   adminMode: boolean;
   transcriptOpen: Set<string>;
   toggleHide: (videoId: string) => void;
   cancelEdit: () => void;
   openEdit: (r: VideoRow) => void;
-  saveEdit: (r: VideoRow) => void;
-  setEditDraft: React.Dispatch<React.SetStateAction<EditDraft>>;
+  saveEdit: (r: VideoRow, draft: EditDraft) => void;
   toggleTranscript: (id: string) => void;
 }
 
@@ -160,12 +158,28 @@ const UP_TYPES = [
 // ─── VIDEO CARD ───────────────────────────────────────────────────────────────
 // Defined at module level so React never remounts it on parent re-renders.
 
-function VideoCard({ r, showFilter, hiddenIds, editingId, editDraft, adminMode, transcriptOpen,
-  toggleHide, cancelEdit, openEdit, saveEdit, setEditDraft, toggleTranscript }: VideoCardProps) {
+function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptOpen,
+  toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript }: VideoCardProps) {
   const sellPts  = pts(r.sellingPoints).map(lbl);
   const tags     = (r.hashtags||"").split(" ").filter(Boolean);
   const hidden   = hiddenIds.has(r.videoId);
   const isEditing = editingId === r.id;
+
+  const [draft, setDraft] = React.useState<EditDraft>({
+    audioHook:"", visualHook:"", textHook:"", videoLength:"", sellingPoints:"", keyIdea:""
+  });
+  React.useEffect(() => {
+    if (isEditing) {
+      setDraft({
+        audioHook:    r.audioHook    || "",
+        visualHook:   r.visualHook   || "",
+        textHook:     r.textHook     || "",
+        videoLength:  r.videoLength  || "",
+        sellingPoints: pts(r.sellingPoints).join("\n"),
+        keyIdea:      r.keyIdea      || "",
+      });
+    }
+  }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   const shortProduct = (r.product||"")
     .replace("for Dogs with Door Protection","")
     .replace("for Full-Size Crew Cab Trucks with Fold Up Seats","")
@@ -242,20 +256,20 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, editDraft, adminMode, 
               <div key={field}>
                 <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>{label}</div>
                 {type==="input" ? (
-                  <input value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))}
+                  <input value={draft[field]||""} onChange={e=>setDraft(d=>({...d,[field]:e.target.value}))}
                     style={{width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,boxSizing:"border-box",outline:"none"}}/>
                 ) : (
-                  <textarea value={editDraft[field]||""} onChange={e=>setEditDraft(d=>({...d,[field]:e.target.value}))} rows={2}
+                  <textarea value={draft[field]||""} onChange={e=>setDraft(d=>({...d,[field]:e.target.value}))} rows={2}
                     style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.5}}/>
                 )}
               </div>
             ))}
             <div>
               <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>✅ Selling Points <span style={{fontWeight:400,color:"#9ca3af"}}>— one per line</span></div>
-              <textarea value={editDraft.sellingPoints||""} onChange={e=>setEditDraft(d=>({...d,sellingPoints:e.target.value}))} rows={3}
+              <textarea value={draft.sellingPoints||""} onChange={e=>setDraft(d=>({...d,sellingPoints:e.target.value}))} rows={3}
                 style={{display:"block",width:"100%",padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none",lineHeight:1.6}}/>
             </div>
-            <button onClick={()=>saveEdit(r)}
+            <button onClick={()=>saveEdit(r, draft)}
               style={{alignSelf:"flex-start",padding:"7px 20px",background:"#111",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>
               💾 Save Changes
             </button>
@@ -355,7 +369,6 @@ export default function TikTokShopReporter() {
   const [isAdmin,   setIsAdmin]   = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [editingId,  setEditingId]  = useState<string | null>(null);
-  const [editDraft,  setEditDraft]  = useState<EditDraft>({audioHook:"",visualHook:"",textHook:"",videoLength:"",sellingPoints:"",keyIdea:""});
   const [transcriptOpen, setTranscriptOpen] = useState<Set<string>>(new Set());
   const [upType,    setUpType]    = useState("alltime");
   const [drag,      setDrag]      = useState(false);
@@ -691,25 +704,17 @@ export default function TikTokShopReporter() {
 
   const openEdit = (r: VideoRow) => {
     setEditingId(r.id);
-    setEditDraft({
-      audioHook:    r.audioHook    || "",
-      visualHook:   r.visualHook   || "",
-      textHook:     r.textHook     || "",
-      videoLength:  r.videoLength  || "",
-      sellingPoints: pts(r.sellingPoints).join("\n"),
-      keyIdea:      r.keyIdea      || "",
-    });
   };
 
-  const saveEdit = async (r: VideoRow) => {
-    const sp = editDraft.sellingPoints.split("\n").map(s=>s.trim()).filter(Boolean).join(" | ");
+  const saveEdit = async (r: VideoRow, draft: EditDraft) => {
+    const sp = draft.sellingPoints.split("\n").map(s=>s.trim()).filter(Boolean).join(" | ");
     const fields: Override = {
-      audioHook:    editDraft.audioHook,
-      visualHook:   editDraft.visualHook,
-      textHook:     editDraft.textHook,
-      videoLength:  editDraft.videoLength,
+      audioHook:    draft.audioHook,
+      visualHook:   draft.visualHook,
+      textHook:     draft.textHook,
+      videoLength:  draft.videoLength,
       sellingPoints: sp,
-      keyIdea:      editDraft.keyIdea,
+      keyIdea:      draft.keyIdea,
     };
     await supabase.from('tiktok_overrides').upsert({
       report_id:     r.videoId,
@@ -837,8 +842,8 @@ export default function TikTokShopReporter() {
   const slicedAt = visAllTime.slice(0, pageAt);
   const slicedLm = filteredLastMonth.slice(0, pageLm);
   const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length};
-  const cardProps = { hiddenIds, editingId, editDraft, adminMode, transcriptOpen,
-    toggleHide, cancelEdit, openEdit, saveEdit, setEditDraft, toggleTranscript };
+  const cardProps = { hiddenIds, editingId, adminMode, transcriptOpen,
+    toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript };
   const gmvAt = visAllTime.reduce((s,r)=>s+r.revenue,0);
   const gmvLm = filteredLastMonth.reduce((s,r)=>s+r.revenue,0);
 
