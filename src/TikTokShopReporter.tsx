@@ -47,6 +47,7 @@ interface Override {
   textHook?: string;
   videoLength?: string;
   sellingPoints?: string;
+  keyIdea?: string;
 }
 
 interface EditDraft {
@@ -55,6 +56,7 @@ interface EditDraft {
   textHook: string;
   videoLength: string;
   sellingPoints: string;
+  keyIdea: string;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -98,7 +100,7 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
       sellingPoints:override.sellingPoints ?? C(r["Selling Points"]||""),
       visualHook:   override.visualHook   ?? "",
       videoLength:  override.videoLength  ?? "",
-      keyIdea:   C(r["Key Idea"] || ""),
+      keyIdea:      override.keyIdea      ?? C(r["Key Idea"] || ""),
       transcript: C(r.Transcript || ""),
     } as Omit<VideoRow, 'id' | 'rank'>;
   }).sort((a,b)=>b.revenue-a.revenue).map((r,i)=>({...r, id:`${source}_${r.videoId||i}`, rank:i+1}));
@@ -151,7 +153,7 @@ export default function TikTokShopReporter() {
   const [isAdmin,   setIsAdmin]   = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [editingId,  setEditingId]  = useState<string | null>(null);
-  const [editDraft,  setEditDraft]  = useState<EditDraft>({audioHook:"",visualHook:"",textHook:"",videoLength:"",sellingPoints:""});
+  const [editDraft,  setEditDraft]  = useState<EditDraft>({audioHook:"",visualHook:"",textHook:"",videoLength:"",sellingPoints:"",keyIdea:""});
   const [transcriptOpen, setTranscriptOpen] = useState<Set<string>>(new Set());
   const [upType,    setUpType]    = useState("alltime");
   const [drag,      setDrag]      = useState(false);
@@ -209,7 +211,7 @@ export default function TikTokShopReporter() {
         textHook:     ov.textHook     ?? "",
         videoLength:  ov.videoLength  ?? "",
         sellingPoints:ov.sellingPoints ?? r.selling_points as string ?? "",
-        keyIdea:      r.key_idea as string ?? "",
+        keyIdea:      ov.keyIdea      ?? r.key_idea as string ?? "",
         transcript:   r.transcript as string ?? "",
         rank:         r.rank as number,
       };
@@ -256,6 +258,7 @@ export default function TikTokShopReporter() {
           textHook:     o.text_hook     || undefined,
           videoLength:  o.video_length  || undefined,
           sellingPoints:o.selling_points|| undefined,
+          keyIdea:      o.key_idea      || undefined,
         });
       });
       setOverridesMap(newMap);
@@ -493,12 +496,20 @@ export default function TikTokShopReporter() {
       textHook:     r.textHook     || "",
       videoLength:  r.videoLength  || "",
       sellingPoints: pts(r.sellingPoints).join("\n"),
+      keyIdea:      r.keyIdea      || "",
     });
   };
 
   const saveEdit = async (r: VideoRow) => {
     const sp = editDraft.sellingPoints.split("\n").map(s=>s.trim()).filter(Boolean).join(" | ");
-    const fields: Override = { audioHook:editDraft.audioHook, visualHook:editDraft.visualHook, textHook:editDraft.textHook, videoLength:editDraft.videoLength, sellingPoints:sp };
+    const fields: Override = {
+      audioHook:    editDraft.audioHook,
+      visualHook:   editDraft.visualHook,
+      textHook:     editDraft.textHook,
+      videoLength:  editDraft.videoLength,
+      sellingPoints: sp,
+      keyIdea:      editDraft.keyIdea,
+    };
     await supabase.from('tiktok_overrides').upsert({
       report_id:     r.id,
       audio_hook:    fields.audioHook,
@@ -506,6 +517,7 @@ export default function TikTokShopReporter() {
       text_hook:     fields.textHook,
       video_length:  fields.videoLength,
       selling_points:fields.sellingPoints,
+      key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
     });
     setOverridesMap(prev => new Map(prev).set(r.id, fields));
@@ -610,6 +622,7 @@ export default function TikTokShopReporter() {
                   ["visualHook",  "🎬 Visual Hook",  "textarea"],
                   ["textHook",    "🎣 Text Hook",    "textarea"],
                   ["videoLength", "⏱ Video Length",  "input"  ],
+                  ["keyIdea",     "💡 Key Idea",      "textarea"],
                 ] as [keyof EditDraft, string, string][]
               ).map(([field, label, type]) => (
                 <div key={field}>
