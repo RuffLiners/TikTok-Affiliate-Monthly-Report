@@ -382,6 +382,7 @@ export default function TikTokShopReporter() {
   const [draftLm,   setDraftLm]   = useState<number|"">("");
   const [draftCr,   setDraftCr]   = useState<number|"">("");
   const [overridesMap, setOverridesMap] = useState<Map<string, Override>>(new Map());
+  const localOverridesRef = useRef<Map<string, Override>>(new Map());
   const [dataLoading, setDataLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -494,6 +495,8 @@ export default function TikTokShopReporter() {
           keyIdea:      o.key_idea      || undefined,
         });
       });
+      // Merge locally-saved overrides so a background load() never reverts unsaved edits
+      localOverridesRef.current.forEach((v, k) => newMap.set(k, v));
       setOverridesMap(newMap);
 
       const hiddenSet = new Set(hiddenRows?.map((h: {video_id:string}) => h.video_id) || []);
@@ -761,7 +764,9 @@ export default function TikTokShopReporter() {
       selling_points:fields.sellingPoints,
       key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
-    });
+    }, { onConflict: 'report_id' });
+    // Track in ref so any subsequent load() call re-merges these rather than reverting them
+    localOverridesRef.current.set(r.videoId, fields);
     setOverridesMap(prev => new Map(prev).set(r.videoId, fields));
     // Apply to every row with the same videoId across all pages
     const upd = (rs: VideoRow[]) => rs.map(rec => rec.videoId===r.videoId ? {...rec,...fields} : rec);
