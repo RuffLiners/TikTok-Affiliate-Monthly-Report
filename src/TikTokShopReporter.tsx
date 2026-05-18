@@ -1061,125 +1061,103 @@ export default function TikTokShopReporter() {
     );
   };
 
-  // Compact video tile used inside hook/selling-point cards
-  const MiniVideoTile = ({v, label}: {v: VideoRow; label?: string}) => (
-    <div>
-      {label && (
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-          <span style={{background:"#111",color:"#fff",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>{label}</span>
-          <span style={{fontWeight:700,color:"#16a34a",fontSize:12}}>{f$(v.revenue)}</span>
-          <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
-          <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
-        </div>
-      )}
+  // Video tile at original 325px width — no cutoff, stats below
+  const VideoTile = ({v, pos}: {v: VideoRow; pos: number}) => (
+    <div style={{flexShrink:0,width:325}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,flexWrap:"wrap"}}>
+        <span style={{background:"#111",color:"#fff",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>
+          {["1st","2nd","3rd"][pos]||`#${pos+1}`}
+        </span>
+        <span style={{fontWeight:700,color:"#16a34a",fontSize:12}}>{f$(v.revenue)}</span>
+        <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
+        <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
+      </div>
       {v.videoId ? (
-        <div style={{width:260,height:462,overflow:"hidden",borderRadius:9,background:"#0a0a0a",flexShrink:0}}>
+        <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
           <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
-            style={{display:"block",width:260,height:590,border:"none"}}
+            style={{display:"block",width:325,height:738,border:"none"}}
             allowFullScreen allow="encrypted-media" loading="lazy" title={`@${v.creator}`}/>
         </div>
       ) : (
-        <div style={{width:260,height:462,background:"#111",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
+        <div style={{width:325,height:578,background:"#111",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
       )}
-      <div style={{marginTop:7,display:"flex",gap:12}}>
+      <div style={{marginTop:8,display:"flex",gap:14}}>
         {[["👁",fK(v.views)],["❤️",fK(v.likes)],["💬",fK(v.comments)]].map(([ic,val])=>(
-          <div key={ic as string} style={{display:"flex",alignItems:"center",gap:3}}>
-            <span style={{fontSize:11}}>{ic}</span>
-            <span style={{fontWeight:700,fontSize:12,color:"#111"}}>{val}</span>
+          <div key={ic as string}>
+            <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic}</div>
+            <div style={{fontWeight:700,fontSize:13,color:"#111"}}>{val}</div>
           </div>
         ))}
       </div>
     </div>
   );
 
-  // A single ranked hook/CTA entry row + its top video
-  const HookRow = ({h, rank, accent}: {h: HookSummary; rank: number; accent: string}) => {
+  // One ranked hook entry: compact header strip + all top videos side by side
+  const HookEntry = ({h, rank, accent}: {h: HookSummary; rank: number; accent: string}) => {
     const medals = ["🥇","🥈","🥉"];
-    const topV = h.topVideos[0];
     return (
-      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",display:"flex",flexDirection:"column"}}>
-        {/* Header row */}
-        <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
-          <span style={{fontSize:rank<3?22:15,flexShrink:0,lineHeight:1,paddingTop:2}}>{medals[rank]||`#${rank+1}`}</span>
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
+          <span style={{fontSize:rank<3?22:15,flexShrink:0}}>{medals[rank]||`#${rank+1}`}</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.4}}>{h.hookText}</div>
-            <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>{h.totalVideos} video{h.totalVideos!==1?"s":""}</div>
+            <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.35}}>{h.hookText}</div>
+            <div style={{fontSize:11,color:"#9ca3af",marginTop:1}}>{h.totalVideos} video{h.totalVideos!==1?"s":""}</div>
           </div>
-          <div style={{fontWeight:800,fontSize:15,color:"#16a34a",flexShrink:0,paddingTop:2}}>{f$(h.totalGmv)}</div>
+          <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(h.totalGmv)}</div>
         </div>
-        {/* Top video */}
-        {topV && (
-          <div style={{padding:"12px 14px"}}>
-            <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>🏆 Top Video</div>
-            <MiniVideoTile v={topV}/>
+        {h.topVideos.length>0 && (
+          <div style={{padding:"14px 16px"}}>
+            <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
+              🏆 Top Video{h.topVideos.length>1?"s":""}
+            </div>
+            <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+              {h.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
+            </div>
           </div>
         )}
       </div>
     );
   };
 
-  // Hook section: title bar + 3-column grid of HookRows
+  // Hook section: accent header + stacked hook entries
   const HookSection = ({hooks, icon, title, accent}: {hooks: HookSummary[]; icon: string; title: string; accent: string}) => {
     if (hooks.length === 0) return null;
     return (
-      <div style={{marginBottom:28}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <div style={{background:accent,borderRadius:9,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{icon}</div>
-          <div>
-            <div style={{fontWeight:800,fontSize:16,color:"#111"}}>{title}</div>
-            <div style={{fontSize:11,color:"#9ca3af"}}>Top {hooks.length} by cumulative GMV</div>
-          </div>
+      <div style={{marginBottom:24}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <div style={{background:accent,borderRadius:9,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{icon}</div>
+          <div style={{fontWeight:800,fontSize:15,color:"#111"}}>{title}</div>
+          <div style={{fontSize:11,color:"#9ca3af",marginLeft:2}}>— top {hooks.length} by cumulative GMV</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
-          {hooks.map((h,i) => <HookRow key={h.hookText} h={h} rank={i} accent={accent}/>)}
-        </div>
+        {hooks.map((h,i) => <HookEntry key={h.hookText} h={h} rank={i} accent={accent}/>)}
       </div>
     );
   };
 
-  // Selling point: compact ranked row + top video inline
+  // Selling point: compact header + all top videos side by side
   const SellingPointRow = ({sp, rank}: {sp: SellingPointSummary; rank: number}) => {
     const medals = ["🥇","🥈","🥉","4th","5th"];
-    const topV = sp.topVideos[0];
     return (
-      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",display:"flex",gap:0}}>
-        {/* Left: metadata */}
-        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
-          <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"14px 16px",borderBottom:"1px solid #f5f5f5"}}>
-            <span style={{fontSize:rank<3?22:14,flexShrink:0,lineHeight:1,paddingTop:rank<3?0:3,fontWeight:700,color:"#6b7280"}}>{medals[rank]||`#${rank+1}`}</span>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.4}}>{sp.point}</div>
-              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
-                {sp.product && <span style={{fontSize:10,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 8px",fontWeight:500}}>{sp.product}</span>}
-                <span style={{fontSize:11,color:"#9ca3af"}}>{sp.totalVideos} video{sp.totalVideos!==1?"s":""}</span>
-              </div>
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
+          <span style={{fontSize:rank<3?22:14,flexShrink:0,fontWeight:700,color:"#6b7280"}}>{medals[rank]||`#${rank+1}`}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.35}}>{sp.point}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+              {sp.product && <span style={{fontSize:10,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 8px",fontWeight:500}}>{sp.product}</span>}
+              <span style={{fontSize:11,color:"#9ca3af"}}>{sp.totalVideos} video{sp.totalVideos!==1?"s":""}</span>
             </div>
-            <div style={{fontWeight:800,fontSize:15,color:"#16a34a",flexShrink:0,paddingTop:2}}>{f$(sp.totalGmv)}</div>
           </div>
-          {/* Other top videos preview (text only) */}
-          {sp.topVideos.length > 1 && (
-            <div style={{padding:"10px 16px",display:"flex",flexDirection:"column",gap:5}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Also appears in</div>
-              {sp.topVideos.slice(1,3).map((v,i) => (
-                <div key={v.id||i} style={{display:"flex",alignItems:"center",gap:8,fontSize:11}}>
-                  <span style={{color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
-                  <span style={{color:"#16a34a",fontWeight:700}}>{f$(v.revenue)}</span>
-                  <span style={{color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(sp.totalGmv)}</div>
         </div>
-        {/* Right: top video embed */}
-        {topV && (
-          <div style={{flexShrink:0,padding:"12px 14px",borderLeft:"1px solid #f0f0f0",background:"#fafafa",display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em"}}>🏆 Top Video</div>
-            <div style={{display:"flex",gap:6,alignItems:"center",fontSize:11,flexWrap:"wrap"}}>
-              <span style={{fontWeight:700,color:"#16a34a"}}>{f$(topV.revenue)}</span>
-              <span style={{color:"#9ca3af"}}>{fN(topV.itemsSold)} sold</span>
-              <span style={{color:"#6b7280",fontWeight:600}}>@{topV.creator}</span>
+        {sp.topVideos.length>0 && (
+          <div style={{padding:"14px 16px"}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
+              🏆 Top Video{sp.topVideos.length>1?"s":""}
             </div>
-            <MiniVideoTile v={topV}/>
+            <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+              {sp.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
+            </div>
           </div>
         )}
       </div>
