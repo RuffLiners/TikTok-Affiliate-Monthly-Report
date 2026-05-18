@@ -1487,15 +1487,16 @@ export default function TikTokShopReporter() {
                 <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
 
                 {/* ── CTAs ── */}
-                {topCTAs.length>0 && (
-                  <>
-                    <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
-                      <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
-                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
+                <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
+                  <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
+                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
+                </div>
+                {topCTAs.length>0
+                  ? <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626"/>
+                  : <div style={{background:"#fff",borderRadius:12,border:"1px dashed #d1d5db",padding:"28px 20px",textAlign:"center",marginBottom:28,color:"#9ca3af",fontSize:13}}>
+                      No CTA data yet — edit videos and fill in the <strong style={{color:"#374151"}}>Call to Action</strong> field to see top CTAs here.
                     </div>
-                    <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626"/>
-                  </>
-                )}
+                }
 
                 {/* ── Selling Points ── */}
                 {topSellingPoints.length>0 && (
