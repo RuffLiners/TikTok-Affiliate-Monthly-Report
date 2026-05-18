@@ -100,7 +100,9 @@ const fK  = (v: number): string => { const n=Number(v||0); return n>=1e6?(n/1e6)
 
 // ─── CSV PARSER ───────────────────────────────────────────────────────────────
 
-const parseCSV = (text: string, source: string, overridesMap: Map<string, Override>): VideoRow[] => {
+// parseCSV always stores raw CSV values — overrides are applied separately so
+// tiktok_reports stays clean and tiktok_overrides is the sole source for edits.
+const parseCSV = (text: string, source: string): VideoRow[] => {
   const result = Papa.parse<Record<string,string>>(text.replace(/^﻿/,"").trim(), {header:true, skipEmptyLines:true});
   const rows = result.data.filter(r => r.URL && r.Creator);
   const sorted = rows.map(r => {
@@ -109,7 +111,6 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
     const rev = parseFloat((r["Video Revenue"]||"").replace(/[$,]/g,""))||0;
     const desc = (r.Description||"").replace(/#\w+/g,"").trim();
     const tags = ((r.Description||"").match(/#\w+/g)||[]).join(" ");
-    const override = overridesMap.get(vid) || {};
     return {
       source,
       creator: (r.Creator||"").trim(),
@@ -124,17 +125,32 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
       hashtags: tags,
       product: (r.Product||"").trim(),
       datePosted: (r.Date||"").slice(0,10),
-      audioHook:    override.audioHook    ?? C(r.Hooks||""),
-      textHook:     override.textHook     ?? "",
-      sellingPoints:override.sellingPoints ?? C(r["Selling Points"]||""),
-      visualHook:   override.visualHook   ?? "",
-      videoLength:  override.videoLength  ?? "",
-      keyIdea:      override.keyIdea      ?? C(r["Key Idea"] || ""),
-      transcript: C(r.Transcript || ""),
+      audioHook:    C(r.Hooks||""),
+      textHook:     "",
+      sellingPoints:C(r["Selling Points"]||""),
+      visualHook:   "",
+      videoLength:  "",
+      keyIdea:      C(r["Key Idea"] || ""),
+      transcript:   C(r.Transcript || ""),
     } as Omit<VideoRow, 'id' | 'rank'>;
   }).sort((a,b)=>b.revenue-a.revenue).map((r,i)=>({...r, id:`${source}_${r.videoId||i}`, rank:i+1}));
   return sorted as VideoRow[];
 };
+
+// Apply an overrides map onto an array of raw VideoRows.
+const applyOverrides = (rows: VideoRow[], oMap: Map<string, Override>): VideoRow[] =>
+  rows.map(r => {
+    const ov = oMap.get(r.videoId) || {};
+    return {
+      ...r,
+      audioHook:     ov.audioHook     ?? r.audioHook,
+      visualHook:    ov.visualHook    ?? r.visualHook,
+      textHook:      ov.textHook      ?? r.textHook,
+      videoLength:   ov.videoLength   ?? r.videoLength,
+      sellingPoints: ov.sellingPoints ?? r.sellingPoints,
+      keyIdea:       ov.keyIdea       ?? r.keyIdea,
+    };
+  });
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
 
@@ -489,7 +505,7 @@ export default function TikTokShopReporter() {
         { data: pubLmRows },
         { data: pubInhRows },
       ] = await Promise.all([
-        supabase.from('tiktok_overrides').select('*'),
+        supabase.from('tiktok_overrides').select('*').order('updated_at', { ascending: true }),
         supabase.from('tiktok_hidden_videos').select('video_id'),
         supabase.from('tiktok_hub_settings').select('*'),
         supabase.from('tiktok_reports').select('*').eq('source','alltime'),
@@ -784,34 +800,56 @@ export default function TikTokShopReporter() {
     Array.from(files).forEach(f => {
       const reader = new FileReader();
       reader.onload = async e => {
-        const recs = parseCSV(e.target!.result as string, upType, overridesMap);
+        // Always fetch the latest saved overrides from the DB before parsing so
+        // manually-edited fields are never lost when a CSV is re-uploaded.
+        const { data: freshOverrideRows } = await supabase
+          .from('tiktok_overrides').select('*').order('updated_at', { ascending: true });
+        const freshOverrides = new Map<string, Override>();
+        freshOverrideRows?.forEach((o: Record<string,string>) => {
+          freshOverrides.set(o.report_id, {
+            audioHook:    o.audio_hook    || undefined,
+            visualHook:   o.visual_hook   || undefined,
+            textHook:     o.text_hook     || undefined,
+            videoLength:  o.video_length  || undefined,
+            sellingPoints:o.selling_points|| undefined,
+            keyIdea:      o.key_idea      || undefined,
+          });
+        });
+        // Also fold in any locally-saved overrides not yet persisted to DB
+        localOverridesRef.current.forEach((v, k) => freshOverrides.set(k, v));
+        setOverridesMap(freshOverrides);
 
-        // Replace existing rows for this source in Supabase
+        // Parse raw CSV values — no overrides baked in so tiktok_reports stays clean
+        const rawRecs = parseCSV(e.target!.result as string, upType);
+
+        // Store raw CSV values in DB (overrides live only in tiktok_overrides)
         await supabase.from('tiktok_reports').delete().eq('source', upType);
         await supabase.from('tiktok_reports').insert(
-          recs.map(r => ({
-            id:           r.id,
-            source:       r.source,
-            video_id:     r.videoId,
-            video_link:   r.videoLink,
-            creator:      r.creator,
-            revenue:      r.revenue,
-            items_sold:   r.itemsSold,
-            views:        r.views,
-            likes:        r.likes,
-            comments:     r.comments,
-            description:  r.description,
-            hashtags:     r.hashtags,
-            product:      r.product,
-            date_posted:  r.datePosted,
-            audio_hook:   r.audioHook,
-            selling_points: r.sellingPoints,
-            key_idea:     r.keyIdea,
-            transcript:   r.transcript,
-            rank:         r.rank,
+          rawRecs.map(r => ({
+            id:             r.id,
+            source:         r.source,
+            video_id:       r.videoId,
+            video_link:     r.videoLink,
+            creator:        r.creator,
+            revenue:        r.revenue,
+            items_sold:     r.itemsSold,
+            views:          r.views,
+            likes:          r.likes,
+            comments:       r.comments,
+            description:    r.description,
+            hashtags:       r.hashtags,
+            product:        r.product,
+            date_posted:    r.datePosted,
+            audio_hook:     r.audioHook,      // raw CSV value only
+            selling_points: r.sellingPoints,  // raw CSV value only
+            key_idea:       r.keyIdea,        // raw CSV value only
+            transcript:     r.transcript,
+            rank:           r.rank,
           }))
         );
 
+        // Apply saved overrides to local state so the UI reflects edits immediately
+        const recs = applyOverrides(rawRecs, freshOverrides);
         if (upType==="alltime")   { setAllTime(recs);   setPageAt(20); }
         if (upType==="lastmonth") { setLastMonth(recs); setPageLm(20); }
         if (upType==="inhouse")   setInhouse(recs);
@@ -842,7 +880,7 @@ export default function TikTokShopReporter() {
       sellingPoints: sp,
       keyIdea:      draft.keyIdea,
     };
-    await supabase.from('tiktok_overrides').upsert({
+    const overrideRow = {
       report_id:     r.videoId,
       audio_hook:    fields.audioHook,
       visual_hook:   fields.visualHook,
@@ -851,7 +889,15 @@ export default function TikTokShopReporter() {
       selling_points:fields.sellingPoints,
       key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
-    }, { onConflict: 'report_id' });
+    };
+    const { error: upsertErr } = await supabase
+      .from('tiktok_overrides').upsert(overrideRow, { onConflict: 'report_id' });
+    if (upsertErr) {
+      // Fallback: delete any existing row(s) then insert fresh — handles tables
+      // that don't yet have a unique constraint on report_id.
+      await supabase.from('tiktok_overrides').delete().eq('report_id', r.videoId);
+      await supabase.from('tiktok_overrides').insert(overrideRow);
+    }
     // Track in ref so any subsequent load() call re-merges these rather than reverting them
     localOverridesRef.current.set(r.videoId, fields);
     setOverridesMap(prev => new Map(prev).set(r.videoId, fields));
