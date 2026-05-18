@@ -529,6 +529,14 @@ export default function TikTokShopReporter() {
         if (s.key === 'pub_filter_cr') { npcr=n; setPubCr(n); }
         if (s.key === 'pub_hidden_ids') { try { phid=JSON.parse(s.value); setPubHiddenIds(new Set(phid)); } catch {} }
         if (s.key === 'last_imported') { li=s.value; setLastImported(s.value); }
+        // ov_VIDEOID keys are override backups written by saveEdit
+        if (s.key.startsWith('ov_')) {
+          try {
+            const videoId = s.key.slice(3);
+            const f: Override = JSON.parse(s.value);
+            newMap.set(videoId, { ...(newMap.get(videoId) || {}), ...f });
+          } catch {}
+        }
       });
 
       const at   = (atRows    || []).sort(srt).map(r => toRow(r, newMap));
@@ -784,7 +792,41 @@ export default function TikTokShopReporter() {
     Array.from(files).forEach(f => {
       const reader = new FileReader();
       reader.onload = async e => {
-        const recs = parseCSV(e.target!.result as string, upType, overridesMap);
+        // Always fetch the latest saved overrides from the DB before parsing so
+        // manually-edited fields are never lost when a CSV is re-uploaded.
+        const [
+          { data: freshOverrideRows },
+          { data: freshSettings },
+        ] = await Promise.all([
+          supabase.from('tiktok_overrides').select('*').order('updated_at', { ascending: true }),
+          supabase.from('tiktok_hub_settings').select('key,value'),
+        ]);
+        const freshOverrides = new Map<string, Override>();
+        // tiktok_overrides (primary)
+        freshOverrideRows?.forEach((o: Record<string,string>) => {
+          freshOverrides.set(o.report_id, {
+            audioHook:    o.audio_hook    || undefined,
+            visualHook:   o.visual_hook   || undefined,
+            textHook:     o.text_hook     || undefined,
+            videoLength:  o.video_length  || undefined,
+            sellingPoints:o.selling_points|| undefined,
+            keyIdea:      o.key_idea      || undefined,
+          });
+        });
+        // tiktok_hub_settings ov_* keys (guaranteed-working backup)
+        freshSettings?.forEach((s: {key:string, value:string}) => {
+          if (s.key.startsWith('ov_')) {
+            try {
+              const videoId = s.key.slice(3);
+              const f: Override = JSON.parse(s.value);
+              freshOverrides.set(videoId, { ...(freshOverrides.get(videoId) || {}), ...f });
+            } catch {}
+          }
+        });
+        // Also fold in any locally-saved overrides not yet persisted to DB
+        localOverridesRef.current.forEach((v, k) => freshOverrides.set(k, v));
+        setOverridesMap(freshOverrides);
+        const recs = parseCSV(e.target!.result as string, upType, freshOverrides);
 
         // Replace existing rows for this source in Supabase
         await supabase.from('tiktok_reports').delete().eq('source', upType);
@@ -842,7 +884,7 @@ export default function TikTokShopReporter() {
       sellingPoints: sp,
       keyIdea:      draft.keyIdea,
     };
-    await supabase.from('tiktok_overrides').upsert({
+    const overrideRow = {
       report_id:     r.videoId,
       audio_hook:    fields.audioHook,
       visual_hook:   fields.visualHook,
@@ -851,7 +893,20 @@ export default function TikTokShopReporter() {
       selling_points:fields.sellingPoints,
       key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
-    }, { onConflict: 'report_id' });
+    };
+    const { error: upsertErr } = await supabase
+      .from('tiktok_overrides').upsert(overrideRow, { onConflict: 'report_id' });
+    if (upsertErr) {
+      await supabase.from('tiktok_overrides').delete().eq('report_id', r.videoId);
+      await supabase.from('tiktok_overrides').insert(overrideRow);
+    }
+    // Belt-and-suspenders: also persist to tiktok_hub_settings which is confirmed
+    // writable. This survives even if tiktok_overrides has RLS or schema issues.
+    await supabase.from('tiktok_hub_settings').upsert({
+      key: `ov_${r.videoId}`,
+      value: JSON.stringify(fields),
+      updated_at: new Date().toISOString(),
+    });
     // Track in ref so any subsequent load() call re-merges these rather than reverting them
     localOverridesRef.current.set(r.videoId, fields);
     setOverridesMap(prev => new Map(prev).set(r.videoId, fields));
