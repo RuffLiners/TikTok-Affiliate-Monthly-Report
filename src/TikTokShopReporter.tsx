@@ -183,7 +183,7 @@ const TABS = [
   {id:"lastmonth", label:"Last Month High GMV",     icon:"📅"},
   {id:"inhouse",   label:"In-House High GMV",       icon:"🎬"},
   {id:"creators",  label:"Top Creators",            icon:"⭐"},
-  {id:"hooks",     label:"Top Performing Hooks",    icon:"🪝"},
+  {id:"hooks",     label:"Hooks, CTA & Selling Points", icon:"🪝"},
 ];
 
 const UP_TYPES = [
@@ -745,6 +745,7 @@ export default function TikTokShopReporter() {
   const topVisualHooks   = useMemo(() => buildTopHooks(src, 'visualHook'),  [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topTextHooks     = useMemo(() => buildTopHooks(src, 'textHook'),    [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topAudioHooks    = useMemo(() => buildTopAudioHooks(src),           [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topCTAs          = useMemo(() => buildTopHooks(src, 'cta'),         [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── filter helpers ───────────────────────────────────────────────────────────
@@ -1060,144 +1061,125 @@ export default function TikTokShopReporter() {
     );
   };
 
-  const HookCard = ({h, rank}: {h: HookSummary; rank: number}) => {
-    const medals = ["🥇","🥈","🥉"];
-    return (
-      <div style={{background:"#fff",borderRadius:16,border:"1px solid #e5e7eb",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:20,overflow:"hidden"}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:14,padding:"16px 22px",borderBottom:"1px solid #f0f0f0",background:"#fafafa"}}>
-          <div style={{fontSize:rank<3?28:20,minWidth:40,textAlign:"center",paddingTop:2}}>{medals[rank]||`#${rank+1}`}</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:15,color:"#111",lineHeight:1.45}}>{h.hookText}</div>
-            <div style={{fontSize:11,color:"#9ca3af",marginTop:3}}>{h.totalVideos} video{h.totalVideos!==1?"s":""} using this hook</div>
-          </div>
-          <div style={{fontWeight:800,fontSize:24,color:"#16a34a",flexShrink:0}}>{f$(h.totalGmv)}</div>
+  // Compact video tile used inside hook/selling-point cards
+  const MiniVideoTile = ({v, label}: {v: VideoRow; label?: string}) => (
+    <div>
+      {label && (
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+          <span style={{background:"#111",color:"#fff",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>{label}</span>
+          <span style={{fontWeight:700,color:"#16a34a",fontSize:12}}>{f$(v.revenue)}</span>
+          <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
+          <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
         </div>
-        {h.topVideos.length>0 && (
-          <div style={{padding:"16px 22px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>
-              🏆 Top {h.topVideos.length} Video{h.topVideos.length!==1?"s":""}
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
-              {h.topVideos.map((v,i)=>(
-                <div key={v.id||i} style={{width:325,flexShrink:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                    <span style={{background:"#111",color:"#fff",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>
-                      {["1st","2nd","3rd"][i]||`#${i+1}`}
-                    </span>
-                    <span style={{fontWeight:700,color:"#16a34a",fontSize:13}}>{f$(v.revenue)}</span>
-                    <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
-                    <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
-                    {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
-                  </div>
-                  {v.videoId ? (
-                    <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
-                      <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
-                        style={{display:"block",width:325,height:738,border:"none"}}
-                        allowFullScreen allow="encrypted-media" loading="lazy" title={`@${v.creator}`}/>
-                    </div>
-                  ) : (
-                    <div style={{width:325,height:578,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
-                  )}
-                  {v.product && (
-                    <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      <span style={{fontSize:9,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em"}}>Product</span>
-                      <span style={{fontSize:11,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 9px",fontWeight:500}}>{v.product}</span>
-                    </div>
-                  )}
-                  <div style={{marginTop:10,display:"flex",gap:14}}>
-                    {[["👁","Views",fK(v.views)],["❤️","Likes",fK(v.likes)],["💬","Comments",fK(v.comments)]].map(([ic,lb,val])=>(
-                      <div key={lb as string}>
-                        <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic} {lb}</div>
-                        <div style={{fontWeight:700,fontSize:14,color:"#111"}}>{val}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {pts(v.sellingPoints).length>0 && (
-                    <div style={{marginTop:8}}>
-                      {pts(v.sellingPoints).slice(0,2).map((p,j)=>(
-                        <div key={j} style={{fontSize:11,color:"#4b5563",display:"flex",gap:6,marginBottom:3}}>
-                          <span style={{color:"#16a34a",flexShrink:0}}>✓</span>{lbl(p)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+      )}
+      {v.videoId ? (
+        <div style={{width:260,height:462,overflow:"hidden",borderRadius:9,background:"#0a0a0a",flexShrink:0}}>
+          <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
+            style={{display:"block",width:260,height:590,border:"none"}}
+            allowFullScreen allow="encrypted-media" loading="lazy" title={`@${v.creator}`}/>
+        </div>
+      ) : (
+        <div style={{width:260,height:462,background:"#111",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
+      )}
+      <div style={{marginTop:7,display:"flex",gap:12}}>
+        {[["👁",fK(v.views)],["❤️",fK(v.likes)],["💬",fK(v.comments)]].map(([ic,val])=>(
+          <div key={ic as string} style={{display:"flex",alignItems:"center",gap:3}}>
+            <span style={{fontSize:11}}>{ic}</span>
+            <span style={{fontWeight:700,fontSize:12,color:"#111"}}>{val}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // A single ranked hook/CTA entry row + its top video
+  const HookRow = ({h, rank, accent}: {h: HookSummary; rank: number; accent: string}) => {
+    const medals = ["🥇","🥈","🥉"];
+    const topV = h.topVideos[0];
+    return (
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",display:"flex",flexDirection:"column"}}>
+        {/* Header row */}
+        <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
+          <span style={{fontSize:rank<3?22:15,flexShrink:0,lineHeight:1,paddingTop:2}}>{medals[rank]||`#${rank+1}`}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.4}}>{h.hookText}</div>
+            <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>{h.totalVideos} video{h.totalVideos!==1?"s":""}</div>
+          </div>
+          <div style={{fontWeight:800,fontSize:15,color:"#16a34a",flexShrink:0,paddingTop:2}}>{f$(h.totalGmv)}</div>
+        </div>
+        {/* Top video */}
+        {topV && (
+          <div style={{padding:"12px 14px"}}>
+            <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>🏆 Top Video</div>
+            <MiniVideoTile v={topV}/>
           </div>
         )}
       </div>
     );
   };
 
-  const SellingPointCard = ({sp, rank}: {sp: SellingPointSummary; rank: number}) => {
-    const medals = ["🥇","🥈","🥉","4th","5th"];
+  // Hook section: title bar + 3-column grid of HookRows
+  const HookSection = ({hooks, icon, title, accent}: {hooks: HookSummary[]; icon: string; title: string; accent: string}) => {
+    if (hooks.length === 0) return null;
     return (
-      <div style={{background:"#fff",borderRadius:16,border:"1px solid #e5e7eb",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:20,overflow:"hidden"}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:14,padding:"16px 22px",borderBottom:"1px solid #f0f0f0",background:"#fafafa"}}>
-          <div style={{fontSize:rank<3?28:16,minWidth:40,textAlign:"center",paddingTop:rank<3?2:5,fontWeight:700,color:"#6b7280"}}>{medals[rank]||`#${rank+1}`}</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:15,color:"#111",lineHeight:1.45}}>{sp.point}</div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}>
-              {sp.product && <span style={{fontSize:11,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 9px",fontWeight:500}}>{sp.product}</span>}
-              <span style={{fontSize:11,color:"#9ca3af"}}>{sp.totalVideos} video{sp.totalVideos!==1?"s":""} using this point</span>
-            </div>
+      <div style={{marginBottom:28}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div style={{background:accent,borderRadius:9,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{icon}</div>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:"#111"}}>{title}</div>
+            <div style={{fontSize:11,color:"#9ca3af"}}>Top {hooks.length} by cumulative GMV</div>
           </div>
-          <div style={{fontWeight:800,fontSize:24,color:"#16a34a",flexShrink:0}}>{f$(sp.totalGmv)}</div>
         </div>
-        {sp.topVideos.length>0 && (
-          <div style={{padding:"16px 22px"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>
-              🏆 Top {sp.topVideos.length} Video{sp.topVideos.length!==1?"s":""}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+          {hooks.map((h,i) => <HookRow key={h.hookText} h={h} rank={i} accent={accent}/>)}
+        </div>
+      </div>
+    );
+  };
+
+  // Selling point: compact ranked row + top video inline
+  const SellingPointRow = ({sp, rank}: {sp: SellingPointSummary; rank: number}) => {
+    const medals = ["🥇","🥈","🥉","4th","5th"];
+    const topV = sp.topVideos[0];
+    return (
+      <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.05)",display:"flex",gap:0}}>
+        {/* Left: metadata */}
+        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"14px 16px",borderBottom:"1px solid #f5f5f5"}}>
+            <span style={{fontSize:rank<3?22:14,flexShrink:0,lineHeight:1,paddingTop:rank<3?0:3,fontWeight:700,color:"#6b7280"}}>{medals[rank]||`#${rank+1}`}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.4}}>{sp.point}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                {sp.product && <span style={{fontSize:10,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 8px",fontWeight:500}}>{sp.product}</span>}
+                <span style={{fontSize:11,color:"#9ca3af"}}>{sp.totalVideos} video{sp.totalVideos!==1?"s":""}</span>
+              </div>
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
-              {sp.topVideos.map((v,i)=>(
-                <div key={v.id||i} style={{width:325,flexShrink:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                    <span style={{background:"#111",color:"#fff",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>
-                      {["1st","2nd","3rd"][i]||`#${i+1}`}
-                    </span>
-                    <span style={{fontWeight:700,color:"#16a34a",fontSize:13}}>{f$(v.revenue)}</span>
-                    <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
-                    <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
-                    {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
-                  </div>
-                  {v.videoId ? (
-                    <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
-                      <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
-                        style={{display:"block",width:325,height:738,border:"none"}}
-                        allowFullScreen allow="encrypted-media" loading="lazy" title={`@${v.creator}`}/>
-                    </div>
-                  ) : (
-                    <div style={{width:325,height:578,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
-                  )}
-                  {v.product && (
-                    <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                      <span style={{fontSize:9,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em"}}>Product</span>
-                      <span style={{fontSize:11,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 9px",fontWeight:500}}>{v.product}</span>
-                    </div>
-                  )}
-                  <div style={{marginTop:10,display:"flex",gap:14}}>
-                    {[["👁","Views",fK(v.views)],["❤️","Likes",fK(v.likes)],["💬","Comments",fK(v.comments)]].map(([ic,lb,val])=>(
-                      <div key={lb as string}>
-                        <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic} {lb}</div>
-                        <div style={{fontWeight:700,fontSize:14,color:"#111"}}>{val}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {pts(v.sellingPoints).length>0 && (
-                    <div style={{marginTop:8}}>
-                      {pts(v.sellingPoints).map(lbl).map((p,j)=>(
-                        <div key={j} style={{fontSize:11,display:"flex",gap:6,marginBottom:3,alignItems:"flex-start"}}>
-                          <span style={{color: p.toLowerCase()===sp.point.toLowerCase()?"#16a34a":"#d1d5db",flexShrink:0,fontWeight:700}}>✓</span>
-                          <span style={{color: p.toLowerCase()===sp.point.toLowerCase()?"#111":"#9ca3af",fontWeight: p.toLowerCase()===sp.point.toLowerCase()?600:400,lineHeight:1.4}}>{p}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+            <div style={{fontWeight:800,fontSize:15,color:"#16a34a",flexShrink:0,paddingTop:2}}>{f$(sp.totalGmv)}</div>
+          </div>
+          {/* Other top videos preview (text only) */}
+          {sp.topVideos.length > 1 && (
+            <div style={{padding:"10px 16px",display:"flex",flexDirection:"column",gap:5}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Also appears in</div>
+              {sp.topVideos.slice(1,3).map((v,i) => (
+                <div key={v.id||i} style={{display:"flex",alignItems:"center",gap:8,fontSize:11}}>
+                  <span style={{color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
+                  <span style={{color:"#16a34a",fontWeight:700}}>{f$(v.revenue)}</span>
+                  <span style={{color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
                 </div>
               ))}
             </div>
+          )}
+        </div>
+        {/* Right: top video embed */}
+        {topV && (
+          <div style={{flexShrink:0,padding:"12px 14px",borderLeft:"1px solid #f0f0f0",background:"#fafafa",display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em"}}>🏆 Top Video</div>
+            <div style={{display:"flex",gap:6,alignItems:"center",fontSize:11,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,color:"#16a34a"}}>{f$(topV.revenue)}</span>
+              <span style={{color:"#9ca3af"}}>{fN(topV.itemsSold)} sold</span>
+              <span style={{color:"#6b7280",fontWeight:600}}>@{topV.creator}</span>
+            </div>
+            <MiniVideoTile v={topV}/>
           </div>
         )}
       </div>
@@ -1206,7 +1188,7 @@ export default function TikTokShopReporter() {
 
   const slicedAt = visAllTime.slice(0, pageAt);
   const slicedLm = filteredLastMonth.slice(0, pageLm);
-  const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length, hooks:topVisualHooks.length+topTextHooks.length+topAudioHooks.length};
+  const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length, hooks:topVisualHooks.length+topTextHooks.length+topAudioHooks.length+topCTAs.length+topSellingPoints.length};
   const cardProps = { hiddenIds, editingId, adminMode, transcriptOpen,
     toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript };
   const gmvAt = visAllTime.reduce((s,r)=>s+r.revenue,0);
@@ -1492,65 +1474,42 @@ export default function TikTokShopReporter() {
         )}
 
         {tab==="hooks" && (
-          topVisualHooks.length===0 && topTextHooks.length===0 && topAudioHooks.length===0 && topSellingPoints.length===0
-            ? <Empty msg='Upload the All-Time report first — Top Hooks and Selling Points are computed from that data'/>
-            : <>
-                {/* ── Top Performing Hooks ── */}
+          topVisualHooks.length===0 && topTextHooks.length===0 && topAudioHooks.length===0 && topCTAs.length===0 && topSellingPoints.length===0
+            ? <Empty msg='Upload the All-Time report first — Hooks, CTAs, and Selling Points are computed from that data'/>
+            : <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                {/* ── Hooks ── */}
                 <div style={{marginBottom:8}}>
-                  <div style={{fontWeight:900,fontSize:24,color:"#111",marginBottom:4}}>🪝 Top Performing Hooks</div>
-                  <div style={{fontSize:13,color:"#9ca3af",marginBottom:28}}>Top 3 hooks per type, ranked by cumulative GMV across all all-time videos</div>
+                  <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>🪝 Hooks</div>
+                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 3 per type by cumulative GMV across all all-time videos</div>
                 </div>
+                <HookSection hooks={topVisualHooks} icon="🎬" title="Visual Hooks" accent="#7c3aed"/>
+                <HookSection hooks={topTextHooks}   icon="🎣" title="Text Hooks"   accent="#0891b2"/>
+                <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
 
-                {topVisualHooks.length>0 && (
-                  <div style={{marginBottom:36}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-                      <div style={{background:"#7c3aed",borderRadius:10,width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎬</div>
-                      <div>
-                        <div style={{fontWeight:800,fontSize:20,color:"#111"}}>Visual Hooks</div>
-                        <div style={{fontSize:12,color:"#9ca3af"}}>Top 3 by total GMV across all videos</div>
-                      </div>
-                    </div>
-                    {topVisualHooks.map((h,i)=><HookCard key={h.hookText} h={h} rank={i}/>)}
-                  </div>
-                )}
-
-                {topTextHooks.length>0 && (
-                  <div style={{marginBottom:36}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-                      <div style={{background:"#0891b2",borderRadius:10,width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎣</div>
-                      <div>
-                        <div style={{fontWeight:800,fontSize:20,color:"#111"}}>Text Hooks</div>
-                        <div style={{fontSize:12,color:"#9ca3af"}}>Top 3 by total GMV across all videos</div>
-                      </div>
-                    </div>
-                    {topTextHooks.map((h,i)=><HookCard key={h.hookText} h={h} rank={i}/>)}
-                  </div>
-                )}
-
-                {topAudioHooks.length>0 && (
-                  <div style={{marginBottom:48}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-                      <div style={{background:"#d97706",borderRadius:10,width:38,height:38,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎵</div>
-                      <div>
-                        <div style={{fontWeight:800,fontSize:20,color:"#111"}}>Audio Hooks</div>
-                        <div style={{fontSize:12,color:"#9ca3af"}}>Top 3 individual audio hooks by total GMV (split from pipe-separated hook fields)</div>
-                      </div>
-                    </div>
-                    {topAudioHooks.map((h,i)=><HookCard key={h.hookText} h={h} rank={i}/>)}
-                  </div>
-                )}
-
-                {/* ── Best Selling Points ── */}
-                {topSellingPoints.length>0 && (
+                {/* ── CTAs ── */}
+                {topCTAs.length>0 && (
                   <>
-                    <div style={{borderTop:"2px solid #e5e7eb",paddingTop:32,marginBottom:8}}>
-                      <div style={{fontWeight:900,fontSize:24,color:"#111",marginBottom:4}}>✅ Best Selling Points</div>
-                      <div style={{fontSize:13,color:"#9ca3af",marginBottom:28}}>Top 5 individual selling points by cumulative GMV, grouped per product — highlighted in each video's selling point list</div>
+                    <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
+                      <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
+                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
                     </div>
-                    {topSellingPoints.map((sp,i)=><SellingPointCard key={`${sp.product}::${sp.point}`} sp={sp} rank={i}/>)}
+                    <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626"/>
                   </>
                 )}
-              </>
+
+                {/* ── Selling Points ── */}
+                {topSellingPoints.length>0 && (
+                  <>
+                    <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
+                      <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>✅ Best Selling Points</div>
+                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 5 individual selling points by cumulative GMV, grouped per product</div>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                      {topSellingPoints.map((sp,i)=><SellingPointRow key={`${sp.product}::${sp.point}`} sp={sp} rank={i}/>)}
+                    </div>
+                  </>
+                )}
+              </div>
         )}
       </div>
 
