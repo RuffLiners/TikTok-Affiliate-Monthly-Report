@@ -167,15 +167,37 @@ export default function TikTokShopReporter() {
   const [overridesMap, setOverridesMap] = useState<Map<string, Override>>(new Map());
   const [dataLoading, setDataLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [popupVideo, setPopupVideo] = useState<VideoRow | null>(null);
+  const [lastImported, setLastImported] = useState("");
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [pubAt, setPubAt] = useState(0);
+  const [pubLm, setPubLm] = useState(0);
+  const [pubCr, setPubCr] = useState(0);
+  const [pubHiddenIds, setPubHiddenIds] = useState<Set<string>>(new Set());
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
   useEffect(() => {
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const loggedIn = !!session;
+      setIsLoggedIn(loggedIn);
+      const adminFlag = session?.user?.user_metadata?.is_admin === true;
+      setIsAdmin(adminFlag);
+      if (!loggedIn) { setAdminMode(false); setShowLoginModal(false); }
+    });
+
     const load = async () => {
       setDataLoading(true);
 
       // Detect admin from session metadata
       const { data: { session } } = await supabase.auth.getSession();
+      const loggedIn = !!session;
+      setIsLoggedIn(loggedIn);
       const adminFlag = session?.user?.user_metadata?.is_admin === true;
       setIsAdmin(adminFlag);
 
@@ -204,6 +226,11 @@ export default function TikTokShopReporter() {
         if (s.key === 'filter_at') { setSavedAt(n); setDraftAt(n || ""); }
         if (s.key === 'filter_lm') { setSavedLm(n); setDraftLm(n || ""); }
         if (s.key === 'filter_cr') { setSavedCr(n); setDraftCr(n || ""); }
+        if (s.key === 'pub_filter_at') setPubAt(Number(s.value) || 0);
+        if (s.key === 'pub_filter_lm') setPubLm(Number(s.value) || 0);
+        if (s.key === 'pub_filter_cr') setPubCr(Number(s.value) || 0);
+        if (s.key === 'pub_hidden_ids') { try { setPubHiddenIds(new Set(JSON.parse(s.value))); } catch {} }
+        if (s.key === 'last_imported') setLastImported(s.value);
       });
 
       // Load reports
@@ -244,16 +271,27 @@ export default function TikTokShopReporter() {
       setDataLoading(false);
     };
     load();
+    return () => authSub.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!popupVideo) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setPopupVideo(null); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [popupVideo]);
 
   // ── derived ─────────────────────────────────────────────────────────────────
 
   const visAllTime = useMemo(
     () => {
-      const base = adminMode ? allTime : allTime.filter(v => !hiddenIds.has(v.videoId));
-      return savedAt > 0 ? base.filter(v => v.revenue >= savedAt) : base;
+      if (adminMode) {
+        return savedAt > 0 ? allTime.filter(v => v.revenue >= savedAt) : allTime;
+      }
+      const base = allTime.filter(v => !pubHiddenIds.has(v.videoId));
+      return pubAt > 0 ? base.filter(v => v.revenue >= pubAt) : base;
     },
-    [allTime, adminMode, hiddenIds, savedAt]
+    [allTime, adminMode, savedAt, pubHiddenIds, pubAt]
   );
 
   const creators = useMemo<CreatorSummary[]>(() => {
@@ -286,13 +324,19 @@ export default function TikTokShopReporter() {
   }, [allTime, lastMonth]);
 
   const filteredLastMonth = useMemo(
-    () => savedLm > 0 ? lastMonth.filter(v => v.revenue >= savedLm) : lastMonth,
-    [lastMonth, savedLm]
+    () => {
+      const threshold = adminMode ? savedLm : pubLm;
+      return threshold > 0 ? lastMonth.filter(v => v.revenue >= threshold) : lastMonth;
+    },
+    [lastMonth, adminMode, savedLm, pubLm]
   );
 
   const filteredCreators = useMemo(
-    () => savedCr > 0 ? creators.filter(c => c.gmv >= savedCr) : creators,
-    [creators, savedCr]
+    () => {
+      const threshold = adminMode ? savedCr : pubCr;
+      return threshold > 0 ? creators.filter(c => c.gmv >= threshold) : creators;
+    },
+    [creators, adminMode, savedCr, pubCr]
   );
 
   // ── filter helpers ───────────────────────────────────────────────────────────
@@ -311,6 +355,21 @@ export default function TikTokShopReporter() {
   const clearFilterAt = () => { setSavedAt(0); setDraftAt(""); setPageAt(20); persistSetting('filter_at',0); };
   const clearFilterLm = () => { setSavedLm(0); setDraftLm(""); setPageLm(20); persistSetting('filter_lm',0); };
   const clearFilterCr = () => { setSavedCr(0); setDraftCr(""); persistSetting('filter_cr',0); };
+
+  const publishDashboard = async () => {
+    const now = new Date().toISOString();
+    const hiddenArr = JSON.stringify(Array.from(hiddenIds));
+    await supabase.from('tiktok_hub_settings').upsert([
+      { key: 'pub_filter_at', value: String(savedAt), updated_at: now },
+      { key: 'pub_filter_lm', value: String(savedLm), updated_at: now },
+      { key: 'pub_filter_cr', value: String(savedCr), updated_at: now },
+      { key: 'pub_hidden_ids', value: hiddenArr, updated_at: now },
+    ]);
+    setPubAt(savedAt);
+    setPubLm(savedLm);
+    setPubCr(savedCr);
+    setPubHiddenIds(new Set(hiddenIds));
+  };
 
   // ── file handling ────────────────────────────────────────────────────────────
 
@@ -350,6 +409,10 @@ export default function TikTokShopReporter() {
         if (upType==="alltime")   { setAllTime(recs);   setPageAt(20); }
         if (upType==="lastmonth") { setLastMonth(recs); setPageLm(20); }
         if (upType==="inhouse")   setInhouse(recs);
+        const now = new Date();
+        const dateStr = `${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${now.getFullYear()}`;
+        await supabase.from('tiktok_hub_settings').upsert({key:'last_imported',value:dateStr,updated_at:new Date().toISOString()});
+        setLastImported(dateStr);
         setShowUp(false);
       };
       reader.readAsText(f);
@@ -413,7 +476,6 @@ export default function TikTokShopReporter() {
     const tags     = (r.hashtags||"").split(" ").filter(Boolean);
     const hidden   = hiddenIds.has(r.videoId);
     const isEditing = editingId === r.id;
-    const txOpen   = transcriptOpen.has(r.id);
     const shortProduct = (r.product||"")
       .replace("for Dogs with Door Protection","")
       .replace("for Full-Size Crew Cab Trucks with Fold Up Seats","")
@@ -433,9 +495,19 @@ export default function TikTokShopReporter() {
 
         <div style={{flexShrink:0,width:280,background:"#0a0a0a",display:"flex",flexDirection:"column"}}>
           {r.videoId ? (
-            <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
-              style={{display:"block",width:280,height:420,border:"none",flexShrink:0}}
-              allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
+            <div style={{position:"relative",flexShrink:0}}>
+              <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
+                style={{display:"block",width:280,height:420,border:"none"}}
+                allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
+              <div
+                onClick={()=>setPopupVideo(r)}
+                style={{position:"absolute",inset:0,cursor:"pointer",zIndex:10,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:10}}
+              >
+                <span style={{background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:11,padding:"3px 10px",borderRadius:20,fontWeight:500,pointerEvents:"none"}}>
+                  ▶ Click to watch
+                </span>
+              </div>
+            </div>
           ) : (
             <div style={{width:280,height:420,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
               <span style={{fontSize:24}}>📹</span>No embed
@@ -468,10 +540,12 @@ export default function TikTokShopReporter() {
                   {hidden?"🚫":"👁"}
                 </button>
               )}
-              <button onClick={()=>isEditing?cancelEdit():openEdit(r)}
-                style={{padding:"5px 12px",borderRadius:7,border:"1px solid",borderColor:isEditing?"#3b82f6":"#d1d5db",background:isEditing?"#eff6ff":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,color:isEditing?"#2563eb":"#374151"}}>
-                {isEditing?"✕ Close":"✏️ Edit"}
-              </button>
+              {adminMode && (
+                <button onClick={()=>isEditing?cancelEdit():openEdit(r)}
+                  style={{padding:"5px 12px",borderRadius:7,border:"1px solid",borderColor:isEditing?"#3b82f6":"#d1d5db",background:isEditing?"#eff6ff":"#fff",cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:600,color:isEditing?"#2563eb":"#374151"}}>
+                  {isEditing?"✕ Close":"✏️ Edit"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -716,6 +790,11 @@ export default function TikTokShopReporter() {
             <div style={{color:"#444",fontSize:10,letterSpacing:"0.1em"}}>CREATOR HUB · TIKTOK SHOP</div>
           </div>
           <span style={{flex:1}}/>
+          {lastImported && (
+            <span style={{fontSize:11,color:"#666",padding:"4px 10px",borderRadius:20,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",whiteSpace:"nowrap"}}>
+              Date last Imported {lastImported}
+            </span>
+          )}
           {isAdmin && (
             <span style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,letterSpacing:"0.05em",
               background:adminMode?"rgba(220,38,38,0.2)":"rgba(255,255,255,0.08)",
@@ -744,10 +823,23 @@ export default function TikTokShopReporter() {
               📥 Export XLSX
             </button>
           )}
-          <button onClick={()=>supabase.auth.signOut()}
-            style={{background:"transparent",color:"#666",border:"1px solid #333",padding:"7px 14px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
-            Sign Out
-          </button>
+          {adminMode && (
+            <button onClick={publishDashboard}
+              style={{background:"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              🚀 Update Dashboard
+            </button>
+          )}
+          {isLoggedIn ? (
+            <button onClick={()=>supabase.auth.signOut()}
+              style={{background:"transparent",color:"#666",border:"1px solid #333",padding:"7px 14px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+              Sign Out
+            </button>
+          ) : (
+            <button onClick={()=>setShowLoginModal(true)}
+              style={{background:"#3b82f6",color:"#fff",border:"none",padding:"7px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              Sign In
+            </button>
+          )}
         </div>
 
         {adminMode && (
@@ -821,10 +913,10 @@ export default function TikTokShopReporter() {
             )}
             {adminMode && hiddenIds.size>0 && <span style={{fontSize:11,color:"#dc2626",flexShrink:0}}>🚫 {hiddenIds.size} hidden</span>}
           </div>
-          {savedAt>0 && (
+          {(adminMode ? savedAt : pubAt)>0 && (
             <div style={{background:"#111",padding:"9px 24px",display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:14}}>🏆</span>
-              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>All Time Videos with GMV &gt; {f$(savedAt)}</span>
+              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>All Time Videos with GMV &gt; {f$(adminMode ? savedAt : pubAt)}</span>
             </div>
           )}
         </>
@@ -856,10 +948,10 @@ export default function TikTokShopReporter() {
               </span>
             )}
           </div>
-          {savedLm>0 && (
+          {(adminMode ? savedLm : pubLm)>0 && (
             <div style={{background:"#111",padding:"9px 24px",display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:14}}>📅</span>
-              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>Last Month Videos with GMV &gt; {f$(savedLm)}</span>
+              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>Last Month Videos with GMV &gt; {f$(adminMode ? savedLm : pubLm)}</span>
             </div>
           )}
         </>
@@ -891,10 +983,10 @@ export default function TikTokShopReporter() {
               </span>
             )}
           </div>
-          {savedCr>0 && (
+          {(adminMode ? savedCr : pubCr)>0 && (
             <div style={{background:"#111",padding:"9px 24px",display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontSize:14}}>⭐</span>
-              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>Top Creators with Total GMV &gt; {f$(savedCr)}</span>
+              <span style={{color:"#fff",fontSize:13,fontWeight:600}}>Top Creators with Total GMV &gt; {f$(adminMode ? savedCr : pubCr)}</span>
             </div>
           )}
         </>
@@ -946,6 +1038,72 @@ export default function TikTokShopReporter() {
             : filteredCreators.map((c,i)=><CreatorCard key={c.creator} c={c} idx={i}/>)
         )}
       </div>
+
+      {popupVideo && (
+        <div
+          onClick={(e)=>{if(e.target===e.currentTarget)setPopupVideo(null);}}
+          style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+        >
+          <div style={{position:"relative"}}>
+            <button
+              onClick={()=>setPopupVideo(null)}
+              style={{position:"absolute",top:-44,right:0,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",borderRadius:8,padding:"7px 16px",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}
+            >
+              ✕ Close
+            </button>
+            <iframe
+              src={`https://www.tiktok.com/embed/v2/${popupVideo.videoId}`}
+              style={{display:"block",width:400,height:710,border:"none",borderRadius:12}}
+              allowFullScreen allow="encrypted-media autoplay"
+              title={`@${popupVideo.creator}`}
+            />
+          </div>
+        </div>
+      )}
+
+      {showLoginModal && (
+        <div
+          onClick={(e)=>{if(e.target===e.currentTarget)setShowLoginModal(false);}}
+          style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center"}}
+        >
+          <div style={{background:"#1a2035",border:"1px solid #2d3748",borderRadius:12,padding:40,width:360}}>
+            <div style={{textAlign:"center",marginBottom:24}}>
+              <div style={{fontSize:28}}>🐾</div>
+              <h2 style={{color:"#f9fafb",fontSize:18,fontWeight:700,margin:"8px 0 4px"}}>Sign In</h2>
+              <p style={{color:"#6b7280",fontSize:13,margin:0}}>Sign in to access admin features.</p>
+            </div>
+            <form onSubmit={async(e)=>{
+              e.preventDefault();
+              setLoginLoading(true); setLoginError('');
+              const {error} = await supabase.auth.signInWithPassword({email:loginEmail,password:loginPassword});
+              if(error){setLoginError(error.message);setLoginLoading(false);}
+              else{setShowLoginModal(false);setLoginEmail('');setLoginPassword('');setLoginLoading(false);}
+            }} style={{display:"flex",flexDirection:"column",gap:14}}>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:"#9ca3af",display:"block",marginBottom:6}}>EMAIL</label>
+                <input type="email" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="you@ruffliners.com" required
+                  style={{width:"100%",background:"#0d1117",border:"1px solid #2d3748",borderRadius:6,color:"#e5e7eb",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:12,fontWeight:600,color:"#9ca3af",display:"block",marginBottom:6}}>PASSWORD</label>
+                <input type="password" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} placeholder="••••••••" required
+                  style={{width:"100%",background:"#0d1117",border:"1px solid #2d3748",borderRadius:6,color:"#e5e7eb",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+              </div>
+              {loginError && (
+                <div style={{background:"#ef444422",border:"1px solid #ef4444",borderRadius:6,padding:"8px 12px",fontSize:12,color:"#ef4444"}}>{loginError}</div>
+              )}
+              <button type="submit" disabled={loginLoading}
+                style={{background:loginLoading?"#1e3a5f":"#3b82f6",color:"#fff",border:"none",borderRadius:7,padding:"11px 0",fontSize:14,fontWeight:700,cursor:loginLoading?"not-allowed":"pointer",marginTop:4}}>
+                {loginLoading?"Please wait…":"Sign In"}
+              </button>
+            </form>
+            <button onClick={()=>setShowLoginModal(false)}
+              style={{display:"block",width:"100%",marginTop:12,background:"none",border:"none",color:"#6b7280",fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:"6px 0"}}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
