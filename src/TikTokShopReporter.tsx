@@ -25,6 +25,7 @@ interface VideoRow {
   sellingPoints: string;
   visualHook: string;
   videoLength: string;
+  cta: string;
   keyIdea: string;
   transcript: string;
   rank: number;
@@ -61,6 +62,7 @@ interface Override {
   visualHook?: string;
   textHook?: string;
   videoLength?: string;
+  cta?: string;
   sellingPoints?: string;
   keyIdea?: string;
 }
@@ -70,6 +72,7 @@ interface EditDraft {
   visualHook: string;
   textHook: string;
   videoLength: string;
+  cta: string;
   sellingPoints: string;
   keyIdea: string;
 }
@@ -129,6 +132,7 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
       sellingPoints:override.sellingPoints ?? C(r["Selling Points"]||""),
       visualHook:   override.visualHook   ?? "",
       videoLength:  override.videoLength  ?? "",
+      cta:          override.cta          ?? "",
       keyIdea:      override.keyIdea      ?? C(r["Key Idea"] || ""),
       transcript: C(r.Transcript || ""),
     } as Omit<VideoRow, 'id' | 'rank'>;
@@ -140,11 +144,11 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
 
 const buildXLSX = (at: VideoRow[], lm: VideoRow[], creators: CreatorSummary[]) => {
   const wb = XLSX.utils.book_new();
-  const vH = ["#","Creator","Video URL","Revenue ($)","Items Sold","Views","Likes","Comments","Product","Description","Hashtags","Visual Hook","Text Hook","Audio Hook","Video Length","Selling Points"];
-  const vR = (r: VideoRow, i: number): (string|number)[] => [i+1,r.creator,r.videoLink,r.revenue,r.itemsSold,r.views,r.likes,r.comments,r.product,r.description,r.hashtags,r.visualHook,r.textHook,r.audioHook,r.videoLength,r.sellingPoints];
+  const vH = ["#","Creator","Video URL","Revenue ($)","Items Sold","Views","Likes","Comments","Product","Description","Hashtags","Visual Hook","Text Hook","Audio Hook","Video Length","CTA","Selling Points"];
+  const vR = (r: VideoRow, i: number): (string|number)[] => [i+1,r.creator,r.videoLink,r.revenue,r.itemsSold,r.views,r.likes,r.comments,r.product,r.description,r.hashtags,r.visualHook,r.textHook,r.audioHook,r.videoLength,r.cta,r.sellingPoints];
   const mkSheet = (rows: VideoRow[], name: string) => {
     const ws = XLSX.utils.aoa_to_sheet([vH,...rows.map((r,i)=>vR(r,i))]);
-    ws["!cols"] = [4,18,30,12,10,12,10,10,28,40,22,22,22,16,12,40].map(w=>({wch:w}));
+    ws["!cols"] = [4,18,30,12,10,12,10,10,28,40,22,22,22,16,12,30,40].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,ws,name);
   };
   mkSheet(at,"All-Time Affiliate"); mkSheet(lm,"Last Month Affiliate");
@@ -182,7 +186,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
   const isEditing = editingId === r.id;
 
   const [draft, setDraft] = React.useState<EditDraft>({
-    audioHook:"", visualHook:"", textHook:"", videoLength:"", sellingPoints:"", keyIdea:""
+    audioHook:"", visualHook:"", textHook:"", videoLength:"", cta:"", sellingPoints:"", keyIdea:""
   });
   React.useEffect(() => {
     if (isEditing) {
@@ -191,6 +195,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
         visualHook:   r.visualHook   || "",
         textHook:     r.textHook     || "",
         videoLength:  r.videoLength  || "",
+        cta:          r.cta          || "",
         sellingPoints: pts(r.sellingPoints).join("\n"),
         keyIdea:      r.keyIdea      || "",
       });
@@ -266,6 +271,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
                 ["visualHook",  "🎬 Visual Hook",  "textarea"],
                 ["textHook",    "🎣 Text Hook",    "textarea"],
                 ["videoLength", "⏱ Video Length",  "input"  ],
+                ["cta",         "📣 Call to Action","input"  ],
                 ["keyIdea",     "💡 Key Idea",      "textarea"],
               ] as [keyof EditDraft, string, string][]
             ).map(([field, label, type]) => (
@@ -337,6 +343,13 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
           <div>
             <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>💡 Key Idea</div>
             <div style={{fontSize:12,color:"#374151",lineHeight:1.5,background:"#fefce8",border:"1px solid #fef08a",borderRadius:7,padding:"7px 11px"}}>{r.keyIdea}</div>
+          </div>
+        )}
+
+        {r.cta && (
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>📣 Call to Action</div>
+            <div style={{fontSize:12,color:"#374151",lineHeight:1.5,background:"#fdf4ff",border:"1px solid #e9d5ff",borderRadius:7,padding:"7px 11px"}}>{r.cta}</div>
           </div>
         )}
 
@@ -441,6 +454,7 @@ export default function TikTokShopReporter() {
         visualHook:   ov.visualHook   ?? "",
         textHook:     ov.textHook     ?? "",
         videoLength:  ov.videoLength  ?? "",
+        cta:          ov.cta          ?? "",
         sellingPoints:ov.sellingPoints ?? r.selling_points as string ?? "",
         keyIdea:      ov.keyIdea      ?? r.key_idea as string ?? "",
         transcript:   r.transcript as string ?? "",
@@ -507,6 +521,7 @@ export default function TikTokShopReporter() {
           visualHook:   o.visual_hook   || undefined,
           textHook:     o.text_hook     || undefined,
           videoLength:  o.video_length  || undefined,
+          cta:          o.cta           || undefined,
           sellingPoints:o.selling_points|| undefined,
           keyIdea:      o.key_idea      || undefined,
         });
@@ -809,6 +824,7 @@ export default function TikTokShopReporter() {
             visualHook:   o.visual_hook   || undefined,
             textHook:     o.text_hook     || undefined,
             videoLength:  o.video_length  || undefined,
+            cta:          o.cta           || undefined,
             sellingPoints:o.selling_points|| undefined,
             keyIdea:      o.key_idea      || undefined,
           });
@@ -881,6 +897,7 @@ export default function TikTokShopReporter() {
       visualHook:   draft.visualHook,
       textHook:     draft.textHook,
       videoLength:  draft.videoLength,
+      cta:          draft.cta,
       sellingPoints: sp,
       keyIdea:      draft.keyIdea,
     };
@@ -890,6 +907,7 @@ export default function TikTokShopReporter() {
       visual_hook:   fields.visualHook,
       text_hook:     fields.textHook,
       video_length:  fields.videoLength,
+      cta:           fields.cta,
       selling_points:fields.sellingPoints,
       key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
