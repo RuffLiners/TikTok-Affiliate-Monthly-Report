@@ -178,6 +178,10 @@ export default function TikTokShopReporter() {
   const [pubLm, setPubLm] = useState(0);
   const [pubCr, setPubCr] = useState(0);
   const [pubHiddenIds, setPubHiddenIds] = useState<Set<string>>(new Set());
+  const [pubAllTime,   setPubAllTime]   = useState<VideoRow[]>([]);
+  const [pubLastMonth, setPubLastMonth] = useState<VideoRow[]>([]);
+  const [pubInhouse,   setPubInhouse]   = useState<VideoRow[]>([]);
+  const [publishing, setPublishing] = useState(false);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -236,7 +240,9 @@ export default function TikTokShopReporter() {
       const { data: reports } = await supabase.from('tiktok_reports').select('*');
       if (reports) {
         const toRow = (r: Record<string,unknown>, om: Map<string,Override>): VideoRow => {
-          const ov = om.get(r.id as string) || {};
+          // pub_alltime_xyz → alltime_xyz for override lookup
+          const ovKey = (r.id as string).replace(/^pub_/, '');
+          const ov = om.get(ovKey) || {};
           return {
             id:           r.id as string,
             source:       r.source as string,
@@ -262,9 +268,13 @@ export default function TikTokShopReporter() {
             rank:         r.rank as number,
           };
         };
-        setAllTime(reports.filter(r => r.source==='alltime').sort((a,b)=>b.revenue-a.revenue).map(r=>toRow(r,newMap)));
-        setLastMonth(reports.filter(r => r.source==='lastmonth').sort((a,b)=>b.revenue-a.revenue).map(r=>toRow(r,newMap)));
-        setInhouse(reports.filter(r => r.source==='inhouse').sort((a,b)=>b.revenue-a.revenue).map(r=>toRow(r,newMap)));
+        const srt = (a: Record<string,unknown>, b: Record<string,unknown>) => (b.revenue as number) - (a.revenue as number);
+        setAllTime(reports.filter(r => r.source==='alltime').sort(srt).map(r=>toRow(r,newMap)));
+        setLastMonth(reports.filter(r => r.source==='lastmonth').sort(srt).map(r=>toRow(r,newMap)));
+        setInhouse(reports.filter(r => r.source==='inhouse').sort(srt).map(r=>toRow(r,newMap)));
+        setPubAllTime(reports.filter(r => r.source==='pub_alltime').sort(srt).map(r=>toRow(r,newMap)));
+        setPubLastMonth(reports.filter(r => r.source==='pub_lastmonth').sort(srt).map(r=>toRow(r,newMap)));
+        setPubInhouse(reports.filter(r => r.source==='pub_inhouse').sort(srt).map(r=>toRow(r,newMap)));
       }
 
       setDataLoading(false);
@@ -280,20 +290,20 @@ export default function TikTokShopReporter() {
       if (adminMode) {
         return savedAt > 0 ? allTime.filter(v => v.revenue >= savedAt) : allTime;
       }
-      const base = allTime.filter(v => !pubHiddenIds.has(v.videoId));
+      const base = pubAllTime.filter(v => !pubHiddenIds.has(v.videoId));
       return pubAt > 0 ? base.filter(v => v.revenue >= pubAt) : base;
     },
-    [allTime, adminMode, savedAt, pubHiddenIds, pubAt]
+    [allTime, adminMode, savedAt, pubAllTime, pubHiddenIds, pubAt]
   );
 
-  const creators = useMemo<CreatorSummary[]>(() => {
-    if (!allTime.length) return [];
+  const buildCreators = (atV: VideoRow[], lmV: VideoRow[]): CreatorSummary[] => {
+    if (!atV.length) return [];
     const map: Record<string, {creator:string; allV:VideoRow[]; lmV:VideoRow[]}> = {};
-    allTime.forEach(v => {
+    atV.forEach(v => {
       if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[]};
       map[v.creator].allV.push(v);
     });
-    lastMonth.forEach(v => {
+    lmV.forEach(v => {
       if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[]};
       map[v.creator].lmV.push(v);
     });
@@ -313,22 +323,31 @@ export default function TikTokShopReporter() {
       })
       .filter(c => c.gmv > 0)
       .sort((a,b) => b.gmv - a.gmv);
-  }, [allTime, lastMonth]);
+  };
+  const creators    = useMemo(() => buildCreators(allTime,    lastMonth),    [allTime,    lastMonth]);     // eslint-disable-line react-hooks/exhaustive-deps
+  const pubCreators = useMemo(() => buildCreators(pubAllTime, pubLastMonth), [pubAllTime, pubLastMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredLastMonth = useMemo(
     () => {
-      const threshold = adminMode ? savedLm : pubLm;
-      return threshold > 0 ? lastMonth.filter(v => v.revenue >= threshold) : lastMonth;
+      if (adminMode) return savedLm > 0 ? lastMonth.filter(v => v.revenue >= savedLm) : lastMonth;
+      const base = pubLastMonth.filter(v => !pubHiddenIds.has(v.videoId));
+      return pubLm > 0 ? base.filter(v => v.revenue >= pubLm) : base;
     },
-    [lastMonth, adminMode, savedLm, pubLm]
+    [lastMonth, adminMode, savedLm, pubLastMonth, pubLm, pubHiddenIds]
+  );
+
+  const visInhouse = useMemo(
+    () => adminMode ? inhouse : pubInhouse.filter(v => !pubHiddenIds.has(v.videoId)),
+    [inhouse, adminMode, pubInhouse, pubHiddenIds]
   );
 
   const filteredCreators = useMemo(
     () => {
+      const src = adminMode ? creators : pubCreators;
       const threshold = adminMode ? savedCr : pubCr;
-      return threshold > 0 ? creators.filter(c => c.gmv >= threshold) : creators;
+      return threshold > 0 ? src.filter(c => c.gmv >= threshold) : src;
     },
-    [creators, adminMode, savedCr, pubCr]
+    [creators, pubCreators, adminMode, savedCr, pubCr]
   );
 
   // ── filter helpers ───────────────────────────────────────────────────────────
@@ -349,7 +368,38 @@ export default function TikTokShopReporter() {
   const clearFilterCr = () => { setSavedCr(0); setDraftCr(""); persistSetting('filter_cr',0); };
 
   const publishDashboard = async () => {
+    setPublishing(true);
     const now = new Date().toISOString();
+
+    const toDbRow = (r: VideoRow, pubSource: string) => ({
+      id: `pub_${r.id}`,
+      source: pubSource,
+      video_id:      r.videoId,
+      video_link:    r.videoLink,
+      creator:       r.creator,
+      revenue:       r.revenue,
+      items_sold:    r.itemsSold,
+      views:         r.views,
+      likes:         r.likes,
+      comments:      r.comments,
+      description:   r.description,
+      hashtags:      r.hashtags,
+      product:       r.product,
+      date_posted:   r.datePosted,
+      audio_hook:    r.audioHook,
+      selling_points:r.sellingPoints,
+      key_idea:      r.keyIdea,
+      transcript:    r.transcript,
+      rank:          r.rank,
+    });
+
+    // Replace all published video snapshots
+    await supabase.from('tiktok_reports').delete().in('source', ['pub_alltime','pub_lastmonth','pub_inhouse']);
+    if (allTime.length)   await supabase.from('tiktok_reports').insert(allTime.map(r   => toDbRow(r,'pub_alltime')));
+    if (lastMonth.length) await supabase.from('tiktok_reports').insert(lastMonth.map(r => toDbRow(r,'pub_lastmonth')));
+    if (inhouse.length)   await supabase.from('tiktok_reports').insert(inhouse.map(r   => toDbRow(r,'pub_inhouse')));
+
+    // Publish filters and hidden-video list
     const hiddenArr = JSON.stringify(Array.from(hiddenIds));
     await supabase.from('tiktok_hub_settings').upsert([
       { key: 'pub_filter_at', value: String(savedAt), updated_at: now },
@@ -357,10 +407,16 @@ export default function TikTokShopReporter() {
       { key: 'pub_filter_cr', value: String(savedCr), updated_at: now },
       { key: 'pub_hidden_ids', value: hiddenArr, updated_at: now },
     ]);
+
+    // Sync local pub state
+    setPubAllTime(allTime.map(r   => ({...r, id:`pub_${r.id}`, source:'pub_alltime'})));
+    setPubLastMonth(lastMonth.map(r => ({...r, id:`pub_${r.id}`, source:'pub_lastmonth'})));
+    setPubInhouse(inhouse.map(r   => ({...r, id:`pub_${r.id}`, source:'pub_inhouse'})));
     setPubAt(savedAt);
     setPubLm(savedLm);
     setPubCr(savedCr);
     setPubHiddenIds(new Set(hiddenIds));
+    setPublishing(false);
   };
 
   // ── file handling ────────────────────────────────────────────────────────────
@@ -485,13 +541,15 @@ export default function TikTokShopReporter() {
         border:`1px solid ${hidden&&adminMode?"#fca5a5":"#e5e7eb"}`,
         marginBottom:16, opacity:hidden&&adminMode?0.55:1}}>
 
-        <div style={{flexShrink:0,width:325,background:"#0a0a0a",display:"flex",flexDirection:"column"}}>
+        <div style={{flexShrink:0,width:325,background:"#0a0a0a"}}>
           {r.videoId ? (
-            <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
-              style={{display:"block",width:325,height:738,border:"none",flexShrink:0}}
-              allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
+            <div style={{width:325,height:578,overflow:"hidden",flexShrink:0}}>
+              <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
+                style={{display:"block",width:325,height:738,border:"none"}}
+                allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
+            </div>
           ) : (
-            <div style={{width:325,height:738,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
+            <div style={{width:325,height:578,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
               <span style={{fontSize:24}}>📹</span>No embed
             </div>
           )}
@@ -686,15 +744,11 @@ export default function TikTokShopReporter() {
                     {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
                   </div>
                   {v.videoId ? (
-                    <>
+                    <div style={{overflow:"hidden",borderRadius:10,height:Math.round(260*(16/9))}}>
                       <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
-                        style={{display:"block",width:"100%",height:400,border:"none",borderRadius:"10px 10px 0 0"}}
+                        style={{display:"block",width:"100%",height:738,border:"none"}}
                         allowFullScreen allow="encrypted-media" loading="lazy" title={`Top video ${i+1}`}/>
-                      <a href={v.videoLink} target="_blank" rel="noopener noreferrer"
-                        style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px",background:"#111",color:"#fff",textDecoration:"none",fontSize:11,fontWeight:500,borderRadius:"0 0 10px 10px"}}>
-                        ▶ Watch on TikTok
-                      </a>
-                    </>
+                    </div>
                   ) : (
                     <div style={{height:200,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
                   )}
@@ -735,7 +789,7 @@ export default function TikTokShopReporter() {
 
   const slicedAt = visAllTime.slice(0, pageAt);
   const slicedLm = filteredLastMonth.slice(0, pageLm);
-  const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:inhouse.length, creators:filteredCreators.length};
+  const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length};
   const gmvAt = visAllTime.reduce((s,r)=>s+r.revenue,0);
   const gmvLm = filteredLastMonth.reduce((s,r)=>s+r.revenue,0);
 
@@ -802,9 +856,9 @@ export default function TikTokShopReporter() {
             </button>
           )}
           {adminMode && (
-            <button onClick={publishDashboard}
-              style={{background:"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
-              🚀 Update Dashboard
+            <button onClick={publishDashboard} disabled={publishing}
+              style={{background:publishing?"#5b21b6":"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:publishing?"not-allowed":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,opacity:publishing?0.8:1}}>
+              {publishing?"⏳ Publishing…":"🚀 Update Dashboard"}
             </button>
           )}
           {isLoggedIn ? (
@@ -1005,9 +1059,9 @@ export default function TikTokShopReporter() {
         )}
 
         {tab==="inhouse" && (
-          inhouse.length===0
+          visInhouse.length===0
             ? <Empty msg="In-House Content report source TBD — upload when available"/>
-            : inhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false}/>)
+            : visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false}/>)
         )}
 
         {tab==="creators" && (
