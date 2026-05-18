@@ -848,12 +848,12 @@ export default function TikTokShopReporter() {
           <span style={{fontSize:22}}>🐾</span>
           <div>
             <div style={{color:"#fff",fontWeight:800,fontSize:15,letterSpacing:"-0.02em"}}>RUFF LINERS</div>
-            <div style={{color:"#444",fontSize:10,letterSpacing:"0.1em"}}>CREATOR HUB · TIKTOK SHOP</div>
+            <div style={{color:"#a0aec0",fontSize:10,letterSpacing:"0.1em"}}>CREATOR HUB · TIKTOK SHOP</div>
           </div>
           <span style={{flex:1}}/>
           {lastImported && (
-            <span style={{fontSize:11,color:"#666",padding:"4px 10px",borderRadius:20,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",whiteSpace:"nowrap"}}>
-              Date last Imported {lastImported}
+            <span style={{fontSize:11,color:"#e2e8f0",padding:"4px 10px",borderRadius:20,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",whiteSpace:"nowrap"}}>
+              Date Last Imported: {lastImported}
             </span>
           )}
           {isAdmin && (
@@ -936,9 +936,9 @@ export default function TikTokShopReporter() {
             const active=tab===t.id;
             return (
               <button key={t.id} onClick={()=>setTab(t.id)}
-                style={{padding:"12px 18px",border:"none",borderBottom:active?"3px solid #fff":"3px solid transparent",background:"none",cursor:"pointer",fontSize:13,fontWeight:active?700:400,color:active?"#fff":"#666",whiteSpace:"nowrap",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,transition:"color .12s"}}>
+                style={{padding:"12px 18px",border:"none",borderBottom:active?"3px solid #fff":"3px solid transparent",background:"none",cursor:"pointer",fontSize:13,fontWeight:active?700:500,color:active?"#fff":"#b0bec5",whiteSpace:"nowrap",fontFamily:"inherit",display:"flex",alignItems:"center",gap:7,transition:"color .12s"}}>
                 {t.icon} {t.label}
-                <span style={{background:active?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.05)",color:active?"#fff":"#555",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>
+                <span style={{background:active?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.08)",color:active?"#fff":"#90a4b4",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>
                   {tabCount[t.id as keyof typeof tabCount]}
                 </span>
               </button>
