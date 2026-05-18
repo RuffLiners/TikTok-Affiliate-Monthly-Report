@@ -676,7 +676,7 @@ export default function TikTokShopReporter() {
     [creators, pubCreators, adminMode, savedCr, pubCr]
   );
 
-  const buildTopHooks = (videos: VideoRow[], field: 'visualHook' | 'textHook'): HookSummary[] => {
+  const buildTopHooks = (videos: VideoRow[], field: 'visualHook' | 'textHook' | 'cta'): HookSummary[] => {
     const map: Record<string, { hookText: string; videos: VideoRow[] }> = {};
     videos.forEach(v => {
       const raw = (v[field] || "").trim();
