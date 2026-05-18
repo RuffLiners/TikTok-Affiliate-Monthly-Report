@@ -432,9 +432,28 @@ export default function TikTokShopReporter() {
     };
     const srt = (a: Record<string,unknown>, b: Record<string,unknown>) => (b.revenue as number) - (a.revenue as number);
 
-    const load = async (showSpinner = true) => {
-      if (showSpinner) setDataLoading(true);
+    const CACHE_KEY = 'rl_data_v1';
 
+    // Restore from sessionStorage immediately — skips the loading spinner on tab switches / page reloads
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const c = JSON.parse(raw);
+        setAllTime(c.at||[]); setLastMonth(c.lm||[]); setInhouse(c.inh||[]);
+        setPubAllTime(c.pat||[]); setPubLastMonth(c.plm||[]); setPubInhouse(c.pinh||[]);
+        setHiddenIds(new Set(c.hid||[]));
+        setPubHiddenIds(new Set(c.phid||[]));
+        setOverridesMap(new Map(c.omap||[]));
+        setSavedAt(c.sat||0); setDraftAt(c.sat||"");
+        setSavedLm(c.slm||0); setDraftLm(c.slm||"");
+        setSavedCr(c.scr||0); setDraftCr(c.scr||"");
+        setPubAt(c.npat||0); setPubLm(c.nplm||0); setPubCr(c.npcr||0);
+        setLastImported(c.li||"");
+        setDataLoading(false);
+      }
+    } catch {}
+
+    const load = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const loggedIn = !!session;
       setIsLoggedIn(loggedIn);
@@ -477,41 +496,55 @@ export default function TikTokShopReporter() {
       });
       setOverridesMap(newMap);
 
-      setHiddenIds(new Set(hiddenRows?.map((h: {video_id:string}) => h.video_id) || []));
+      const hiddenSet = new Set(hiddenRows?.map((h: {video_id:string}) => h.video_id) || []);
+      setHiddenIds(hiddenSet);
 
+      let sat=0, slm=0, scr=0, npat=0, nplm=0, npcr=0, phid: string[]=[], li="";
       settings?.forEach((s: {key:string, value:string}) => {
         const n = Number(s.value) || 0;
-        if (s.key === 'filter_at') { setSavedAt(n); setDraftAt(n || ""); }
-        if (s.key === 'filter_lm') { setSavedLm(n); setDraftLm(n || ""); }
-        if (s.key === 'filter_cr') { setSavedCr(n); setDraftCr(n || ""); }
-        if (s.key === 'pub_filter_at') setPubAt(Number(s.value) || 0);
-        if (s.key === 'pub_filter_lm') setPubLm(Number(s.value) || 0);
-        if (s.key === 'pub_filter_cr') setPubCr(Number(s.value) || 0);
-        if (s.key === 'pub_hidden_ids') { try { setPubHiddenIds(new Set(JSON.parse(s.value))); } catch {} }
-        if (s.key === 'last_imported') setLastImported(s.value);
+        if (s.key === 'filter_at') { sat=n; setSavedAt(n); setDraftAt(n || ""); }
+        if (s.key === 'filter_lm') { slm=n; setSavedLm(n); setDraftLm(n || ""); }
+        if (s.key === 'filter_cr') { scr=n; setSavedCr(n); setDraftCr(n || ""); }
+        if (s.key === 'pub_filter_at') { npat=n; setPubAt(n); }
+        if (s.key === 'pub_filter_lm') { nplm=n; setPubLm(n); }
+        if (s.key === 'pub_filter_cr') { npcr=n; setPubCr(n); }
+        if (s.key === 'pub_hidden_ids') { try { phid=JSON.parse(s.value); setPubHiddenIds(new Set(phid)); } catch {} }
+        if (s.key === 'last_imported') { li=s.value; setLastImported(s.value); }
       });
 
-      setAllTime(   (atRows    || []).sort(srt).map(r => toRow(r, newMap)));
-      setLastMonth( (lmRows    || []).sort(srt).map(r => toRow(r, newMap)));
-      setInhouse(   (inhRows   || []).sort(srt).map(r => toRow(r, newMap)));
-      setPubAllTime((pubAtRows || []).sort(srt).map(r => toRow(r, newMap)));
-      setPubLastMonth((pubLmRows || []).sort(srt).map(r => toRow(r, newMap)));
-      setPubInhouse((pubInhRows || []).sort(srt).map(r => toRow(r, newMap)));
+      const at   = (atRows    || []).sort(srt).map(r => toRow(r, newMap));
+      const lm   = (lmRows    || []).sort(srt).map(r => toRow(r, newMap));
+      const inh  = (inhRows   || []).sort(srt).map(r => toRow(r, newMap));
+      const pat  = (pubAtRows || []).sort(srt).map(r => toRow(r, newMap));
+      const plm  = (pubLmRows || []).sort(srt).map(r => toRow(r, newMap));
+      const pinh = (pubInhRows|| []).sort(srt).map(r => toRow(r, newMap));
 
+      setAllTime(at); setLastMonth(lm); setInhouse(inh);
+      setPubAllTime(pat); setPubLastMonth(plm); setPubInhouse(pinh);
       setDataLoading(false);
+
+      // Persist to sessionStorage so next load is instant
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+          at, lm, inh, pat, plm, pinh,
+          hid: Array.from(hiddenSet),
+          phid,
+          omap: Array.from(newMap.entries()),
+          sat, slm, scr, npat, nplm, npcr, li,
+        }));
+      } catch {}
     };
 
-    // Initial load
+    // Initial load — show spinner only if no cached data was restored above
     load();
 
-    // Re-load when the session is restored after a page refresh (fixes auth timing gap)
+    // Re-load when auth state changes (silent refresh in background)
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
       const loggedIn = !!session;
       setIsLoggedIn(loggedIn);
       setIsAdmin(session?.user?.user_metadata?.is_admin === true);
       if (!loggedIn) { setAdminMode(false); setShowLoginModal(false); }
-      if (event === 'SIGNED_IN') load(true);
-      if (event === 'TOKEN_REFRESHED') load(false);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') load();
     });
 
     return () => authSub.unsubscribe();
@@ -651,6 +684,7 @@ export default function TikTokShopReporter() {
     setPubCr(savedCr);
     setPubHiddenIds(new Set(hiddenIds));
     setPublishing(false);
+    sessionStorage.removeItem('rl_data_v1');
   };
 
   // ── file handling ────────────────────────────────────────────────────────────
@@ -696,6 +730,7 @@ export default function TikTokShopReporter() {
         await supabase.from('tiktok_hub_settings').upsert({key:'last_imported',value:dateStr,updated_at:new Date().toISOString()});
         setLastImported(dateStr);
         setShowUp(false);
+        sessionStorage.removeItem('rl_data_v1');
       };
       reader.readAsText(f);
     });
