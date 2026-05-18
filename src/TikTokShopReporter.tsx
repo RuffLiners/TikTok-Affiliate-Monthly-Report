@@ -972,8 +972,6 @@ export default function TikTokShopReporter() {
         </div>
       </div>
 
-      <div style={{flex:1,overflowY:"auto"}}>
-
       {tab==="alltime" && (
         <>
           <div style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
@@ -1079,6 +1077,8 @@ export default function TikTokShopReporter() {
           )}
         </>
       )}
+
+      <div style={{flex:1,overflowY:"auto"}}>
 
       <div style={{maxWidth:1100,margin:"0 auto",padding:"20px"}}>
 
