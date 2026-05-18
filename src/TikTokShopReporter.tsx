@@ -866,9 +866,9 @@ export default function TikTokShopReporter() {
   }
 
   return (
-    <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:"#f4f5f7",minHeight:"100vh"}}>
+    <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:"#f4f5f7",height:"100vh",display:"flex",flexDirection:"column"}}>
 
-      <div style={{background:"#0c0c0c",padding:"16px 24px 0"}}>
+      <div style={{background:"#0c0c0c",padding:"16px 24px 0",position:"sticky",top:0,zIndex:100,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
           <span style={{fontSize:22}}>🐾</span>
           <div>
@@ -971,6 +971,8 @@ export default function TikTokShopReporter() {
           })}
         </div>
       </div>
+
+      <div style={{flex:1,overflowY:"auto"}}>
 
       {tab==="alltime" && (
         <>
@@ -1124,6 +1126,8 @@ export default function TikTokShopReporter() {
             : filteredCreators.map((c,i)=><CreatorCard key={c.creator} c={c} idx={i}/>)
         )}
       </div>
+
+      </div>{/* end scrollable content */}
 
 
 {showLoginModal && (
