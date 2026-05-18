@@ -45,7 +45,10 @@ interface CreatorSummary {
 interface HookSummary {
   hookText: string;
   totalVideos: number;
+  totalViews: number;
+  totalUnitsSold: number;
   totalGmv: number;
+  videosWithGmv: number;
   topVideos: VideoRow[];
 }
 
@@ -53,7 +56,10 @@ interface SellingPointSummary {
   point: string;
   product: string;
   totalVideos: number;
+  totalViews: number;
+  totalUnitsSold: number;
   totalGmv: number;
+  videosWithGmv: number;
   topVideos: VideoRow[];
 }
 
@@ -687,9 +693,12 @@ export default function TikTokShopReporter() {
     });
     return Object.values(map)
       .map(h => {
-        const topVideos = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
-        const totalGmv  = h.videos.reduce((s, v) => s + v.revenue, 0);
-        return { hookText: h.hookText, totalVideos: h.videos.length, totalGmv, topVideos };
+        const topVideos    = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
+        const totalGmv     = h.videos.reduce((s, v) => s + v.revenue, 0);
+        const totalViews   = h.videos.reduce((s, v) => s + v.views, 0);
+        const totalUnitsSold = h.videos.reduce((s, v) => s + v.itemsSold, 0);
+        const videosWithGmv  = h.videos.filter(v => v.revenue > 0).length;
+        return { hookText: h.hookText, totalVideos: h.videos.length, totalViews, totalUnitsSold, totalGmv, videosWithGmv, topVideos };
       })
       .filter(h => h.totalGmv > 0)
       .sort((a, b) => b.totalGmv - a.totalGmv)
@@ -709,9 +718,12 @@ export default function TikTokShopReporter() {
     });
     return Object.values(map)
       .map(h => {
-        const topVideos = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
-        const totalGmv  = h.videos.reduce((s, v) => s + v.revenue, 0);
-        return { hookText: h.hookText, totalVideos: h.videos.length, totalGmv, topVideos };
+        const topVideos      = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
+        const totalGmv       = h.videos.reduce((s, v) => s + v.revenue, 0);
+        const totalViews     = h.videos.reduce((s, v) => s + v.views, 0);
+        const totalUnitsSold = h.videos.reduce((s, v) => s + v.itemsSold, 0);
+        const videosWithGmv  = h.videos.filter(v => v.revenue > 0).length;
+        return { hookText: h.hookText, totalVideos: h.videos.length, totalViews, totalUnitsSold, totalGmv, videosWithGmv, topVideos };
       })
       .filter(h => h.totalGmv > 0)
       .sort((a, b) => b.totalGmv - a.totalGmv)
@@ -732,9 +744,12 @@ export default function TikTokShopReporter() {
     });
     return Object.values(map)
       .map(h => {
-        const topVideos = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
-        const totalGmv  = h.videos.reduce((s, v) => s + v.revenue, 0);
-        return { point: h.point, product: h.product, totalVideos: h.videos.length, totalGmv, topVideos };
+        const topVideos      = [...h.videos].sort((a, b) => b.revenue - a.revenue).slice(0, 3);
+        const totalGmv       = h.videos.reduce((s, v) => s + v.revenue, 0);
+        const totalViews     = h.videos.reduce((s, v) => s + v.views, 0);
+        const totalUnitsSold = h.videos.reduce((s, v) => s + v.itemsSold, 0);
+        const videosWithGmv  = h.videos.filter(v => v.revenue > 0).length;
+        return { point: h.point, product: h.product, totalVideos: h.videos.length, totalViews, totalUnitsSold, totalGmv, videosWithGmv, topVideos };
       })
       .filter(h => h.totalGmv > 0)
       .sort((a, b) => b.totalGmv - a.totalGmv)
@@ -1092,21 +1107,51 @@ export default function TikTokShopReporter() {
     </div>
   );
 
-  // One ranked hook entry: compact header strip + all top videos side by side
+  // One ranked hook entry: stats row + expand button for videos
   const HookEntry = ({h, rank, accent}: {h: HookSummary; rank: number; accent: string}) => {
     const medals = ["🥇","🥈","🥉"];
+    const [expanded, setExpanded] = React.useState(false);
     return (
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",marginBottom:12}}>
+        {/* Title row */}
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
           <span style={{fontSize:rank<3?22:15,flexShrink:0}}>{medals[rank]||`#${rank+1}`}</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.35}}>{h.hookText}</div>
-            <div style={{fontSize:11,color:"#9ca3af",marginTop:1}}>{h.totalVideos} video{h.totalVideos!==1?"s":""}</div>
           </div>
           <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(h.totalGmv)}</div>
         </div>
+        {/* Stats row */}
+        <div style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
+          {[
+            ["📹","Total Videos",    String(h.totalVideos)],
+            ["👁", "Total Views",     fK(h.totalViews)],
+            ["📦","Units Sold",      fN(h.totalUnitsSold)],
+            ["💰","Total GMV",       f$(h.totalGmv)],
+            ["✅","Videos w/ GMV",  String(h.videosWithGmv)],
+          ].map(([ic,label,val],i,arr) => (
+            <div key={label} style={{flex:1,padding:"10px 12px",borderRight:i<arr.length-1?"1px solid #f0f0f0":"none",textAlign:"center"}}>
+              <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>{ic} {label}</div>
+              <div style={{fontWeight:700,fontSize:13,color:"#111"}}>{val}</div>
+            </div>
+          ))}
+        </div>
+        {/* Expand button */}
         {h.topVideos.length>0 && (
-          <div style={{padding:"14px 16px"}}>
+          <div style={{padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={()=>setExpanded(e=>!e)}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:7,border:"1px solid",
+                borderColor:expanded?accent+"66":"#d1d5db",
+                background:expanded?accent+"11":"#fff",
+                color:expanded?accent:"#374151",
+                cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              {expanded ? "▲ Hide Videos" : "▼ Show Top Videos"}
+            </button>
+            {!expanded && <span style={{fontSize:11,color:"#9ca3af"}}>{h.topVideos.length} video{h.topVideos.length!==1?"s":""} available</span>}
+          </div>
+        )}
+        {expanded && h.topVideos.length>0 && (
+          <div style={{padding:"0 16px 16px"}}>
             <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{h.topVideos.length>1?"s":""}
             </div>
@@ -1134,24 +1179,52 @@ export default function TikTokShopReporter() {
     );
   };
 
-  // Selling point: compact header + all top videos side by side
+  // Selling point: stats row + expand button for videos
   const SellingPointRow = ({sp, rank}: {sp: SellingPointSummary; rank: number}) => {
     const medals = ["🥇","🥈","🥉","4th","5th"];
+    const [expanded, setExpanded] = React.useState(false);
     return (
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",marginBottom:12}}>
+        {/* Title row */}
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
           <span style={{fontSize:rank<3?22:14,flexShrink:0,fontWeight:700,color:"#6b7280"}}>{medals[rank]||`#${rank+1}`}</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.35}}>{sp.point}</div>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
-              {sp.product && <span style={{fontSize:10,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 8px",fontWeight:500}}>{sp.product}</span>}
-              <span style={{fontSize:11,color:"#9ca3af"}}>{sp.totalVideos} video{sp.totalVideos!==1?"s":""}</span>
-            </div>
+            {sp.product && <span style={{fontSize:10,color:"#fff",background:"#374151",borderRadius:20,padding:"2px 8px",fontWeight:500,marginTop:3,display:"inline-block"}}>{sp.product}</span>}
           </div>
           <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(sp.totalGmv)}</div>
         </div>
+        {/* Stats row */}
+        <div style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
+          {[
+            ["📹","Total Videos",    String(sp.totalVideos)],
+            ["👁", "Total Views",     fK(sp.totalViews)],
+            ["📦","Units Sold",      fN(sp.totalUnitsSold)],
+            ["💰","Total GMV",       f$(sp.totalGmv)],
+            ["✅","Videos w/ GMV",  String(sp.videosWithGmv)],
+          ].map(([ic,label,val],i,arr) => (
+            <div key={label} style={{flex:1,padding:"10px 12px",borderRight:i<arr.length-1?"1px solid #f0f0f0":"none",textAlign:"center"}}>
+              <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>{ic} {label}</div>
+              <div style={{fontWeight:700,fontSize:13,color:"#111"}}>{val}</div>
+            </div>
+          ))}
+        </div>
+        {/* Expand button */}
         {sp.topVideos.length>0 && (
-          <div style={{padding:"14px 16px"}}>
+          <div style={{padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={()=>setExpanded(e=>!e)}
+              style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:7,border:"1px solid",
+                borderColor:expanded?"#16a34a66":"#d1d5db",
+                background:expanded?"#f0fdf4":"#fff",
+                color:expanded?"#16a34a":"#374151",
+                cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              {expanded ? "▲ Hide Videos" : "▼ Show Top Videos"}
+            </button>
+            {!expanded && <span style={{fontSize:11,color:"#9ca3af"}}>{sp.topVideos.length} video{sp.topVideos.length!==1?"s":""} available</span>}
+          </div>
+        )}
+        {expanded && sp.topVideos.length>0 && (
+          <div style={{padding:"0 16px 16px"}}>
             <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{sp.topVideos.length>1?"s":""}
             </div>
