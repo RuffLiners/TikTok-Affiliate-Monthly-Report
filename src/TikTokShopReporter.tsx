@@ -80,7 +80,7 @@ const parseCSV = (text: string, source: string, overridesMap: Map<string, Overri
     const rev = parseFloat((r["Video Revenue"]||"").replace(/[$,]/g,""))||0;
     const desc = (r.Description||"").replace(/#\w+/g,"").trim();
     const tags = ((r.Description||"").match(/#\w+/g)||[]).join(" ");
-    const override = overridesMap.get(`${source}_${vid}`) || {};
+    const override = overridesMap.get(vid) || {};
     return {
       source,
       creator: (r.Creator||"").trim(),
@@ -189,8 +189,7 @@ export default function TikTokShopReporter() {
 
   useEffect(() => {
     const toRow = (r: Record<string,unknown>, om: Map<string,Override>): VideoRow => {
-      const ovKey = (r.id as string).replace(/^pub_/, '');
-      const ov = om.get(ovKey) || {};
+      const ov = om.get(r.video_id as string) || {};
       return {
         id:           r.id as string,
         source:       r.source as string,
@@ -511,7 +510,7 @@ export default function TikTokShopReporter() {
       keyIdea:      editDraft.keyIdea,
     };
     await supabase.from('tiktok_overrides').upsert({
-      report_id:     r.id,
+      report_id:     r.videoId,
       audio_hook:    fields.audioHook,
       visual_hook:   fields.visualHook,
       text_hook:     fields.textHook,
@@ -520,8 +519,9 @@ export default function TikTokShopReporter() {
       key_idea:      fields.keyIdea,
       updated_at:    new Date().toISOString(),
     });
-    setOverridesMap(prev => new Map(prev).set(r.id, fields));
-    const upd = (rs: VideoRow[]) => rs.map(rec => rec.id===r.id ? {...rec,...fields} : rec);
+    setOverridesMap(prev => new Map(prev).set(r.videoId, fields));
+    // Apply to every row with the same videoId across all pages
+    const upd = (rs: VideoRow[]) => rs.map(rec => rec.videoId===r.videoId ? {...rec,...fields} : rec);
     setAllTime(upd); setLastMonth(upd); setInhouse(upd);
     setEditingId(null);
   };
