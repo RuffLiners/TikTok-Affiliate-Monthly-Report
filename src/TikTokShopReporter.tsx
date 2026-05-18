@@ -186,26 +186,68 @@ export default function TikTokShopReporter() {
   // ── initial load from Supabase ──────────────────────────────────────────────
 
   useEffect(() => {
-    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const loggedIn = !!session;
-      setIsLoggedIn(loggedIn);
-      const adminFlag = session?.user?.user_metadata?.is_admin === true;
-      setIsAdmin(adminFlag);
-      if (!loggedIn) { setAdminMode(false); setShowLoginModal(false); }
-    });
+    const toRow = (r: Record<string,unknown>, om: Map<string,Override>): VideoRow => {
+      const ovKey = (r.id as string).replace(/^pub_/, '');
+      const ov = om.get(ovKey) || {};
+      return {
+        id:           r.id as string,
+        source:       r.source as string,
+        videoId:      r.video_id as string,
+        videoLink:    r.video_link as string,
+        creator:      r.creator as string,
+        revenue:      r.revenue as number,
+        itemsSold:    r.items_sold as number,
+        views:        r.views as number,
+        likes:        r.likes as number,
+        comments:     r.comments as number,
+        description:  r.description as string,
+        hashtags:     r.hashtags as string,
+        product:      r.product as string,
+        datePosted:   r.date_posted as string,
+        audioHook:    ov.audioHook    ?? r.audio_hook as string ?? "",
+        visualHook:   ov.visualHook   ?? "",
+        textHook:     ov.textHook     ?? "",
+        videoLength:  ov.videoLength  ?? "",
+        sellingPoints:ov.sellingPoints ?? r.selling_points as string ?? "",
+        keyIdea:      r.key_idea as string ?? "",
+        transcript:   r.transcript as string ?? "",
+        rank:         r.rank as number,
+      };
+    };
+    const srt = (a: Record<string,unknown>, b: Record<string,unknown>) => (b.revenue as number) - (a.revenue as number);
 
     const load = async () => {
       setDataLoading(true);
 
-      // Detect admin from session metadata
       const { data: { session } } = await supabase.auth.getSession();
       const loggedIn = !!session;
       setIsLoggedIn(loggedIn);
       const adminFlag = session?.user?.user_metadata?.is_admin === true;
       setIsAdmin(adminFlag);
 
-      // Load overrides
-      const { data: overrideRows } = await supabase.from('tiktok_overrides').select('*');
+      // Run all reads in parallel, each source in its own query to avoid the 1000-row default limit
+      const [
+        { data: overrideRows },
+        { data: hiddenRows },
+        { data: settings },
+        { data: atRows },
+        { data: lmRows },
+        { data: inhRows },
+        { data: pubAtRows },
+        { data: pubLmRows },
+        { data: pubInhRows },
+      ] = await Promise.all([
+        supabase.from('tiktok_overrides').select('*'),
+        supabase.from('tiktok_hidden_videos').select('video_id'),
+        supabase.from('tiktok_hub_settings').select('*'),
+        supabase.from('tiktok_reports').select('*').eq('source','alltime'),
+        supabase.from('tiktok_reports').select('*').eq('source','lastmonth'),
+        supabase.from('tiktok_reports').select('*').eq('source','inhouse'),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_alltime'),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_lastmonth'),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_inhouse'),
+      ]);
+
       const newMap = new Map<string, Override>();
       overrideRows?.forEach((o: Record<string,string>) => {
         newMap.set(o.report_id, {
@@ -218,12 +260,8 @@ export default function TikTokShopReporter() {
       });
       setOverridesMap(newMap);
 
-      // Load hidden videos
-      const { data: hiddenRows } = await supabase.from('tiktok_hidden_videos').select('video_id');
       setHiddenIds(new Set(hiddenRows?.map((h: {video_id:string}) => h.video_id) || []));
 
-      // Load settings
-      const { data: settings } = await supabase.from('tiktok_hub_settings').select('*');
       settings?.forEach((s: {key:string, value:string}) => {
         const n = Number(s.value) || 0;
         if (s.key === 'filter_at') { setSavedAt(n); setDraftAt(n || ""); }
@@ -236,50 +274,28 @@ export default function TikTokShopReporter() {
         if (s.key === 'last_imported') setLastImported(s.value);
       });
 
-      // Load reports
-      const { data: reports } = await supabase.from('tiktok_reports').select('*');
-      if (reports) {
-        const toRow = (r: Record<string,unknown>, om: Map<string,Override>): VideoRow => {
-          // pub_alltime_xyz → alltime_xyz for override lookup
-          const ovKey = (r.id as string).replace(/^pub_/, '');
-          const ov = om.get(ovKey) || {};
-          return {
-            id:           r.id as string,
-            source:       r.source as string,
-            videoId:      r.video_id as string,
-            videoLink:    r.video_link as string,
-            creator:      r.creator as string,
-            revenue:      r.revenue as number,
-            itemsSold:    r.items_sold as number,
-            views:        r.views as number,
-            likes:        r.likes as number,
-            comments:     r.comments as number,
-            description:  r.description as string,
-            hashtags:     r.hashtags as string,
-            product:      r.product as string,
-            datePosted:   r.date_posted as string,
-            audioHook:    ov.audioHook    ?? r.audio_hook as string ?? "",
-            visualHook:   ov.visualHook   ?? "",
-            textHook:     ov.textHook     ?? "",
-            videoLength:  ov.videoLength  ?? "",
-            sellingPoints:ov.sellingPoints ?? r.selling_points as string ?? "",
-            keyIdea:      r.key_idea as string ?? "",
-            transcript:   r.transcript as string ?? "",
-            rank:         r.rank as number,
-          };
-        };
-        const srt = (a: Record<string,unknown>, b: Record<string,unknown>) => (b.revenue as number) - (a.revenue as number);
-        setAllTime(reports.filter(r => r.source==='alltime').sort(srt).map(r=>toRow(r,newMap)));
-        setLastMonth(reports.filter(r => r.source==='lastmonth').sort(srt).map(r=>toRow(r,newMap)));
-        setInhouse(reports.filter(r => r.source==='inhouse').sort(srt).map(r=>toRow(r,newMap)));
-        setPubAllTime(reports.filter(r => r.source==='pub_alltime').sort(srt).map(r=>toRow(r,newMap)));
-        setPubLastMonth(reports.filter(r => r.source==='pub_lastmonth').sort(srt).map(r=>toRow(r,newMap)));
-        setPubInhouse(reports.filter(r => r.source==='pub_inhouse').sort(srt).map(r=>toRow(r,newMap)));
-      }
+      setAllTime(   (atRows    || []).sort(srt).map(r => toRow(r, newMap)));
+      setLastMonth( (lmRows    || []).sort(srt).map(r => toRow(r, newMap)));
+      setInhouse(   (inhRows   || []).sort(srt).map(r => toRow(r, newMap)));
+      setPubAllTime((pubAtRows || []).sort(srt).map(r => toRow(r, newMap)));
+      setPubLastMonth((pubLmRows || []).sort(srt).map(r => toRow(r, newMap)));
+      setPubInhouse((pubInhRows || []).sort(srt).map(r => toRow(r, newMap)));
 
       setDataLoading(false);
     };
+
+    // Initial load
     load();
+
+    // Re-load when the session is restored after a page refresh (fixes auth timing gap)
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
+      const loggedIn = !!session;
+      setIsLoggedIn(loggedIn);
+      setIsAdmin(session?.user?.user_metadata?.is_admin === true);
+      if (!loggedIn) { setAdminMode(false); setShowLoginModal(false); }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') load();
+    });
+
     return () => authSub.unsubscribe();
   }, []);
 
