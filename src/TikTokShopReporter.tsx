@@ -169,7 +169,6 @@ export default function TikTokShopReporter() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [popupVideo, setPopupVideo] = useState<VideoRow | null>(null);
   const [lastImported, setLastImported] = useState("");
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -274,14 +273,7 @@ export default function TikTokShopReporter() {
     return () => authSub.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!popupVideo) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setPopupVideo(null); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [popupVideo]);
-
-  // ── derived ─────────────────────────────────────────────────────────────────
+// ── derived ─────────────────────────────────────────────────────────────────
 
   const visAllTime = useMemo(
     () => {
@@ -493,30 +485,16 @@ export default function TikTokShopReporter() {
         border:`1px solid ${hidden&&adminMode?"#fca5a5":"#e5e7eb"}`,
         marginBottom:16, opacity:hidden&&adminMode?0.55:1}}>
 
-        <div style={{flexShrink:0,width:280,background:"#0a0a0a",display:"flex",flexDirection:"column"}}>
+        <div style={{flexShrink:0,width:325,background:"#0a0a0a",display:"flex",flexDirection:"column"}}>
           {r.videoId ? (
-            <div style={{position:"relative",flexShrink:0}}>
-              <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
-                style={{display:"block",width:280,height:420,border:"none"}}
-                allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
-              <div
-                onClick={()=>setPopupVideo(r)}
-                style={{position:"absolute",inset:0,cursor:"pointer",zIndex:10,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:10}}
-              >
-                <span style={{background:"rgba(0,0,0,0.65)",color:"#fff",fontSize:11,padding:"3px 10px",borderRadius:20,fontWeight:500,pointerEvents:"none"}}>
-                  ▶ Click to watch
-                </span>
-              </div>
-            </div>
+            <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
+              style={{display:"block",width:325,height:738,border:"none",flexShrink:0}}
+              allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
           ) : (
-            <div style={{width:280,height:420,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
+            <div style={{width:325,height:738,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
               <span style={{fontSize:24}}>📹</span>No embed
             </div>
           )}
-          <a href={r.videoLink} target="_blank" rel="noopener noreferrer"
-            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"9px",background:"#111",color:"#fff",textDecoration:"none",fontSize:12,fontWeight:500,flexShrink:0}}>
-            ▶ Watch on TikTok
-          </a>
         </div>
 
         <div style={{flex:1,padding:"16px 20px",overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:10}}>
@@ -1039,29 +1017,8 @@ export default function TikTokShopReporter() {
         )}
       </div>
 
-      {popupVideo && (
-        <div
-          onClick={(e)=>{if(e.target===e.currentTarget)setPopupVideo(null);}}
-          style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
-        >
-          <div style={{position:"relative"}}>
-            <button
-              onClick={()=>setPopupVideo(null)}
-              style={{position:"absolute",top:-44,right:0,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",borderRadius:8,padding:"7px 16px",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}
-            >
-              ✕ Close
-            </button>
-            <iframe
-              src={`https://www.tiktok.com/embed/v2/${popupVideo.videoId}`}
-              style={{display:"block",width:400,height:710,border:"none",borderRadius:12}}
-              allowFullScreen allow="encrypted-media autoplay"
-              title={`@${popupVideo.creator}`}
-            />
-          </div>
-        </div>
-      )}
 
-      {showLoginModal && (
+{showLoginModal && (
         <div
           onClick={(e)=>{if(e.target===e.currentTarget)setShowLoginModal(false);}}
           style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center"}}
