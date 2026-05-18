@@ -432,8 +432,8 @@ export default function TikTokShopReporter() {
     };
     const srt = (a: Record<string,unknown>, b: Record<string,unknown>) => (b.revenue as number) - (a.revenue as number);
 
-    const load = async () => {
-      setDataLoading(true);
+    const load = async (showSpinner = true) => {
+      if (showSpinner) setDataLoading(true);
 
       const { data: { session } } = await supabase.auth.getSession();
       const loggedIn = !!session;
@@ -510,7 +510,8 @@ export default function TikTokShopReporter() {
       setIsLoggedIn(loggedIn);
       setIsAdmin(session?.user?.user_metadata?.is_admin === true);
       if (!loggedIn) { setAdminMode(false); setShowLoginModal(false); }
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') load();
+      if (event === 'SIGNED_IN') load(true);
+      if (event === 'TOKEN_REFRESHED') load(false);
     });
 
     return () => authSub.unsubscribe();
@@ -870,7 +871,7 @@ export default function TikTokShopReporter() {
 
       <div style={{background:"#0c0c0c",padding:"16px 24px 0",position:"sticky",top:0,zIndex:100,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <span style={{fontSize:22}}>🐾</span>
+          <img src="/RuffLinersB.png" alt="Ruff Liners" style={{height:48,width:48,objectFit:"contain",borderRadius:"50%",background:"#fff",flexShrink:0}}/>
           <div>
             <div style={{color:"#fff",fontWeight:800,fontSize:15,letterSpacing:"-0.02em"}}>RUFF LINERS</div>
             <div style={{color:"#a0aec0",fontSize:10,letterSpacing:"0.1em"}}>CREATOR HUB · TIKTOK SHOP</div>
