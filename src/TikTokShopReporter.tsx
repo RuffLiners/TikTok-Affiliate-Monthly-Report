@@ -628,23 +628,23 @@ export default function TikTokShopReporter() {
     [allTime, adminMode, savedAt, pubAllTime, pubHiddenIds, pubAt]
   );
 
-  const buildCreators = (atV: VideoRow[], lmV: VideoRow[]): CreatorSummary[] => {
-    if (!atV.length) return [];
-    const map: Record<string, {creator:string; allV:VideoRow[]; lmV:VideoRow[]}> = {};
-    atV.forEach(v => {
-      if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[]};
-      map[v.creator].allV.push(v);
+  const buildCreators = (atV: VideoRow[], lmV: VideoRow[], inhV: VideoRow[]): CreatorSummary[] => {
+    if (!atV.length && !lmV.length && !inhV.length) return [];
+    const map: Record<string, {creator:string; allV:VideoRow[]; lmV:VideoRow[]; inhV:VideoRow[]}> = {};
+    const addTo = (arr: VideoRow[], key: 'allV'|'lmV'|'inhV') => arr.forEach(v => {
+      if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[], inhV:[]};
+      map[v.creator][key].push(v);
     });
-    lmV.forEach(v => {
-      if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[]};
-      map[v.creator].lmV.push(v);
-    });
+    addTo(atV, 'allV'); addTo(lmV, 'lmV'); addTo(inhV, 'inhV');
     return Object.values(map)
       .map(c => {
         const top3 = [...c.allV].sort((a,b)=>b.revenue-a.revenue).slice(0,3);
+        // Unique total videos across all three sources (deduplicated by videoId)
+        const seen = new Set<string>();
+        [...c.allV, ...c.lmV, ...c.inhV].forEach(v => seen.add(v.videoId || v.id));
         return {
           creator:               c.creator,
-          totalVideos:           c.allV.length,
+          totalVideos:           seen.size,
           unitsSold:             c.allV.reduce((s,v)=>s+v.itemsSold,0),
           gmv:                   c.allV.reduce((s,v)=>s+v.revenue,0),
           videosWithGmv:         c.allV.filter(v=>v.revenue>0).length,
@@ -656,8 +656,8 @@ export default function TikTokShopReporter() {
       .filter(c => c.gmv > 0)
       .sort((a,b) => b.gmv - a.gmv);
   };
-  const creators    = useMemo(() => buildCreators(allTime,    lastMonth),    [allTime,    lastMonth]);     // eslint-disable-line react-hooks/exhaustive-deps
-  const pubCreators = useMemo(() => buildCreators(pubAllTime, pubLastMonth), [pubAllTime, pubLastMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+  const creators    = useMemo(() => buildCreators(allTime,    lastMonth,    inhouse),    [allTime,    lastMonth,    inhouse]);    // eslint-disable-line react-hooks/exhaustive-deps
+  const pubCreators = useMemo(() => buildCreators(pubAllTime, pubLastMonth, pubInhouse), [pubAllTime, pubLastMonth, pubInhouse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredLastMonth = useMemo(
     () => {
