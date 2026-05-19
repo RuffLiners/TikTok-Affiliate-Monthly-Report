@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/sb/:path*",
+      "destination": "https://YOUR_SUPABASE_PROJECT_REF.supabase.co/:path*"
+    }
+  ]
+}
