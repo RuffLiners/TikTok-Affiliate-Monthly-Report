@@ -1279,10 +1279,10 @@ export default function TikTokShopReporter() {
     .rl-embed{width:100%!important;height:calc(100vw * 1.7785)!important}
     .rl-iframe{width:100vw!important;height:calc(100vw * 2.2708)!important}
     .rl-card-body{padding:12px!important}
-    .rl-tile{width:calc(48vw - 8px)!important}
-    .rl-tile-embed{width:calc(48vw - 8px)!important;height:calc((48vw - 8px) * 1.7785)!important}
-    .rl-tile-iframe{width:calc(48vw - 8px)!important;height:calc((48vw - 8px) * 2.2708)!important}
-    .rl-vid-row{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+    .rl-tile{width:72vw!important;max-width:325px}
+    .rl-tile-embed{width:72vw!important;max-width:325px;height:calc(72vw * 1.7785)!important;max-height:578px}
+    .rl-tile-iframe{width:72vw!important;max-width:325px;height:calc(72vw * 2.2708)!important;max-height:738px}
+    .rl-vid-row{flex-wrap:nowrap!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch;padding-bottom:8px;gap:10px!important}
     .rl-stats{overflow-x:auto;-webkit-overflow-scrolling:touch}
     .rl-stats>div{min-width:78px!important;flex-shrink:0!important;flex:none!important}
     .rl-creator-stats{grid-template-columns:repeat(2,1fr)!important}
