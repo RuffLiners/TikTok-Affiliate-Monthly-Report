@@ -1141,7 +1141,7 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>
               🏆 Top {c.top3.length} Video{c.top3.length!==1?"s":""}
             </div>
-            <div className="rl-vid-row" style={{display:"flex",flexWrap:"wrap",gap:16}}>
+            <div className="rl-creator-vid-row" style={{display:"flex",flexWrap:"wrap",gap:16}}>
               {c.top3.map((v,i)=>(
                 <div key={v.id||i} className="rl-tile" style={{width:325,flexShrink:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -1275,7 +1275,7 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{h.topVideos.length>1?"s":""}
             </div>
-            <div className="rl-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div className="rl-inline-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
               {h.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
             </div>
           </div>
@@ -1348,7 +1348,7 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{sp.topVideos.length>1?"s":""}
             </div>
-            <div className="rl-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div className="rl-inline-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
               {sp.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
             </div>
           </div>
@@ -1392,6 +1392,10 @@ export default function TikTokShopReporter() {
     .rl-two-col{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:16px!important;align-items:start!important}
     .rl-two-col>*{margin-bottom:0!important}
     .rl-hooks-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:28px!important;align-items:start!important}
+    .rl-creator-vid-row,.rl-inline-vid-row{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:12px!important}
+    .rl-creator-vid-row .rl-tile,.rl-inline-vid-row .rl-tile{width:100%!important;flex-shrink:unset!important}
+    .rl-creator-vid-row .rl-tile-embed,.rl-inline-vid-row .rl-tile-embed{width:100%!important;height:auto!important;aspect-ratio:325/578!important}
+    .rl-creator-vid-row .rl-tile-iframe,.rl-inline-vid-row .rl-tile-iframe{width:100%!important;height:calc(100% * 738 / 578)!important}
   }
   @media(max-width:639px){
     .rl-header{padding:10px 12px 0!important}
@@ -1627,7 +1631,7 @@ export default function TikTokShopReporter() {
 
       <div style={{flex:1,overflowY:"auto"}}>
 
-      <div className="rl-page" style={{maxWidth:1400,margin:"0 auto",padding:"20px"}}>
+      <div className="rl-page" style={{padding:"20px 24px"}}>
 
         {tab==="alltime" && (
           visAllTime.length===0
