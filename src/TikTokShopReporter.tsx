@@ -529,12 +529,12 @@ export default function TikTokShopReporter() {
         supabase.from('tiktok_overrides').select('*').order('updated_at', { ascending: true }),
         supabase.from('tiktok_hidden_videos').select('video_id'),
         supabase.from('tiktok_hub_settings').select('*'),
-        supabase.from('tiktok_reports').select('*').eq('source','alltime'),
-        supabase.from('tiktok_reports').select('*').eq('source','lastmonth'),
-        supabase.from('tiktok_reports').select('*').eq('source','inhouse'),
-        supabase.from('tiktok_reports').select('*').eq('source','pub_alltime'),
-        supabase.from('tiktok_reports').select('*').eq('source','pub_lastmonth'),
-        supabase.from('tiktok_reports').select('*').eq('source','pub_inhouse'),
+        supabase.from('tiktok_reports').select('*').eq('source','alltime').limit(10000),
+        supabase.from('tiktok_reports').select('*').eq('source','lastmonth').limit(10000),
+        supabase.from('tiktok_reports').select('*').eq('source','inhouse').limit(10000),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_alltime').limit(10000),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_lastmonth').limit(10000),
+        supabase.from('tiktok_reports').select('*').eq('source','pub_inhouse').limit(10000),
       ]);
 
       const newMap = new Map<string, Override>();
@@ -632,8 +632,9 @@ export default function TikTokShopReporter() {
     if (!atV.length && !lmV.length && !inhV.length) return [];
     const map: Record<string, {creator:string; allV:VideoRow[]; lmV:VideoRow[]; inhV:VideoRow[]}> = {};
     const addTo = (arr: VideoRow[], key: 'allV'|'lmV'|'inhV') => arr.forEach(v => {
-      if (!map[v.creator]) map[v.creator] = {creator:v.creator, allV:[], lmV:[], inhV:[]};
-      map[v.creator][key].push(v);
+      const k = v.creator.toLowerCase().trim();
+      if (!map[k]) map[k] = {creator:v.creator, allV:[], lmV:[], inhV:[]};
+      map[k][key].push(v);
     });
     addTo(atV, 'allV'); addTo(lmV, 'lmV'); addTo(inhV, 'inhV');
     return Object.values(map)
