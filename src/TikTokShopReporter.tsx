@@ -143,7 +143,9 @@ const parseCSV = (text: string, source: string): VideoRow[] => {
       keyIdea:      C(r["Key Idea"] || ""),
       transcript:   C(r.Transcript || ""),
     } as Omit<VideoRow, 'id' | 'rank'>;
-  }).sort((a,b)=>b.revenue-a.revenue).map((r,i)=>({...r, id:`${source}_${r.videoId||i}`, rank:i+1}));
+  // Include rank in ID so rows with the same videoId (same video under multiple
+  // products) each get a unique DB row instead of collapsing via upsert.
+  }).sort((a,b)=>b.revenue-a.revenue).map((r,i)=>({...r, id:`${source}_${r.videoId||i}_${i+1}`, rank:i+1}));
   return sorted as VideoRow[];
 };
 
