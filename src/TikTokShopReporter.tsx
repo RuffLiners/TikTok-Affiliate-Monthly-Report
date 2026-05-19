@@ -236,26 +236,26 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
   ].filter(([,,v]) => v) as [string,string,string][];
 
   return (
-    <div style={{display:"flex",background:"#fff",borderRadius:14,overflow:"hidden",
+    <div className="rl-card" style={{display:"flex",background:"#fff",borderRadius:14,overflow:"hidden",
       boxShadow:"0 1px 3px rgba(0,0,0,0.07)",
       border:`1px solid ${hidden&&adminMode?"#fca5a5":"#e5e7eb"}`,
       marginBottom:16, opacity:hidden&&adminMode?0.55:1}}>
 
-      <div style={{flexShrink:0,width:325,background:"#0a0a0a"}}>
+      <div className="rl-card-vid" style={{flexShrink:0,width:325,background:"#0a0a0a"}}>
         {r.videoId ? (
-          <div style={{width:325,height:578,overflow:"hidden",flexShrink:0}}>
-            <iframe src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
+          <div className="rl-embed" style={{width:325,height:578,overflow:"hidden",flexShrink:0}}>
+            <iframe className="rl-iframe" src={`https://www.tiktok.com/embed/v2/${r.videoId}`}
               style={{display:"block",width:325,height:738,border:"none"}}
               allowFullScreen allow="encrypted-media" loading="lazy" title={`@${r.creator}`}/>
           </div>
         ) : (
-          <div style={{width:325,height:578,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
+          <div className="rl-embed" style={{width:325,height:578,display:"flex",alignItems:"center",justifyContent:"center",color:"#444",flexDirection:"column",gap:6,fontSize:12}}>
             <span style={{fontSize:24}}>📹</span>No embed
           </div>
         )}
       </div>
 
-      <div style={{flex:1,padding:"16px 20px",overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:10}}>
+      <div className="rl-card-body" style={{flex:1,padding:"16px 20px",overflow:"hidden",minWidth:0,display:"flex",flexDirection:"column",gap:10}}>
 
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
           <div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
@@ -1008,7 +1008,7 @@ export default function TikTokShopReporter() {
           </div>
           <div style={{fontWeight:800,fontSize:26,color:"#16a34a"}}>{f$(c.gmv)}</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)"}}>
+        <div className="rl-creator-stats" style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)"}}>
           {STATS.map((s,i)=>(
             <div key={s.l} style={{padding:"14px 16px",borderRight:i<5?"1px solid #f0f0f0":"none",borderBottom:"1px solid #f0f0f0"}}>
               <div style={{fontSize:9,color:"#9ca3af",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5,lineHeight:1.3}}>{s.l}</div>
@@ -1021,9 +1021,9 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:14}}>
               🏆 Top {c.top3.length} Video{c.top3.length!==1?"s":""}
             </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
+            <div className="rl-vid-row" style={{display:"flex",flexWrap:"wrap",gap:16}}>
               {c.top3.map((v,i)=>(
-                <div key={v.id||i} style={{width:325,flexShrink:0}}>
+                <div key={v.id||i} className="rl-tile" style={{width:325,flexShrink:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                     <span style={{background:"#111",color:"#fff",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700}}>
                       {["1st","2nd","3rd"][i]||`#${i+1}`}
@@ -1033,13 +1033,13 @@ export default function TikTokShopReporter() {
                     {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
                   </div>
                   {v.videoId ? (
-                    <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
-                      <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
+                    <div className="rl-tile-embed" style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
+                      <iframe className="rl-tile-iframe" src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
                         style={{display:"block",width:325,height:738,border:"none"}}
                         allowFullScreen allow="encrypted-media" loading="lazy" title={`Top video ${i+1}`}/>
                     </div>
                   ) : (
-                    <div style={{width:325,height:578,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
+                    <div className="rl-tile-embed" style={{width:325,height:578,background:"#0a0a0a",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
                   )}
                   {v.product && (
                     <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
@@ -1078,7 +1078,7 @@ export default function TikTokShopReporter() {
 
   // Video tile at original 325px width — no cutoff, stats below
   const VideoTile = ({v, pos}: {v: VideoRow; pos: number}) => (
-    <div style={{flexShrink:0,width:325}}>
+    <div className="rl-tile" style={{flexShrink:0,width:325}}>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,flexWrap:"wrap"}}>
         <span style={{background:"#111",color:"#fff",borderRadius:5,padding:"2px 7px",fontSize:10,fontWeight:700}}>
           {["1st","2nd","3rd"][pos]||`#${pos+1}`}
@@ -1088,13 +1088,13 @@ export default function TikTokShopReporter() {
         <span style={{fontSize:11,color:"#6b7280",fontWeight:600}}>@{v.creator}</span>
       </div>
       {v.videoId ? (
-        <div style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
-          <iframe src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
+        <div className="rl-tile-embed" style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
+          <iframe className="rl-tile-iframe" src={`https://www.tiktok.com/embed/v2/${v.videoId}`}
             style={{display:"block",width:325,height:738,border:"none"}}
             allowFullScreen allow="encrypted-media" loading="lazy" title={`@${v.creator}`}/>
         </div>
       ) : (
-        <div style={{width:325,height:578,background:"#111",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
+        <div className="rl-tile-embed" style={{width:325,height:578,background:"#111",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:12}}>No embed</div>
       )}
       <div style={{marginTop:8,display:"flex",gap:14}}>
         {[["👁",fK(v.views)],["❤️",fK(v.likes)],["💬",fK(v.comments)]].map(([ic,val])=>(
@@ -1114,7 +1114,7 @@ export default function TikTokShopReporter() {
     return (
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",overflow:"hidden",marginBottom:12}}>
         {/* Title row */}
-        <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
+        <div className="rl-hook-entry-hdr" style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",background:"#fafafa",borderBottom:"1px solid #f0f0f0"}}>
           <span style={{fontSize:rank<3?22:15,flexShrink:0}}>{medals[rank]||`#${rank+1}`}</span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:13,color:"#111",lineHeight:1.35}}>{h.hookText}</div>
@@ -1122,7 +1122,7 @@ export default function TikTokShopReporter() {
           <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(h.totalGmv)}</div>
         </div>
         {/* Stats row */}
-        <div style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
+        <div className="rl-stats" style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
           {[
             ["📹","Total Videos",    String(h.totalVideos)],
             ["👁", "Total Views",     fK(h.totalViews)],
@@ -1155,7 +1155,7 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:10,fontWeight:700,color:accent,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{h.topVideos.length>1?"s":""}
             </div>
-            <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div className="rl-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
               {h.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
             </div>
           </div>
@@ -1265,8 +1265,32 @@ export default function TikTokShopReporter() {
 
   return (
     <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",background:"#f4f5f7",height:"100vh",display:"flex",flexDirection:"column"}}>
+      <style>{`
+  .rl-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .rl-tabs::-webkit-scrollbar{display:none}
+  @media(max-width:639px){
+    .rl-header{padding:10px 12px 0!important}
+    .rl-hd-date{display:none!important}
+    .rl-hd-badges{display:none!important}
+    .rl-page{padding:12px!important}
+    .rl-subhdr{padding:8px 12px!important;gap:10px!important}
+    .rl-card{flex-direction:column!important}
+    .rl-card-vid{width:100%!important}
+    .rl-embed{width:100%!important;height:calc(100vw * 1.7785)!important}
+    .rl-iframe{width:100vw!important;height:calc(100vw * 2.2708)!important}
+    .rl-card-body{padding:12px!important}
+    .rl-tile{width:calc(48vw - 8px)!important}
+    .rl-tile-embed{width:calc(48vw - 8px)!important;height:calc((48vw - 8px) * 1.7785)!important}
+    .rl-tile-iframe{width:calc(48vw - 8px)!important;height:calc((48vw - 8px) * 2.2708)!important}
+    .rl-vid-row{flex-wrap:nowrap!important;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+    .rl-stats{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .rl-stats>div{min-width:78px!important;flex-shrink:0!important;flex:none!important}
+    .rl-creator-stats{grid-template-columns:repeat(2,1fr)!important}
+    .rl-hook-entry-hdr{flex-wrap:wrap!important}
+  }
+`}</style>
 
-      <div style={{background:"#0c0c0c",padding:"16px 24px 0",position:"sticky",top:0,zIndex:100,flexShrink:0}}>
+      <div className="rl-header" style={{background:"#0c0c0c",padding:"16px 24px 0",position:"sticky",top:0,zIndex:100,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
           <img src="/RuffLinersB.png" alt="Ruff Liners" style={{height:48,width:48,objectFit:"contain",borderRadius:"50%",background:"#fff",flexShrink:0}}/>
           <div>
@@ -1275,12 +1299,12 @@ export default function TikTokShopReporter() {
           </div>
           <span style={{flex:1}}/>
           {lastImported && (
-            <span style={{fontSize:11,color:"#e2e8f0",padding:"4px 10px",borderRadius:20,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",whiteSpace:"nowrap"}}>
+            <span className="rl-hd-date" style={{fontSize:11,color:"#e2e8f0",padding:"4px 10px",borderRadius:20,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",whiteSpace:"nowrap"}}>
               Date Last Imported: {lastImported}
             </span>
           )}
           {isAdmin && (
-            <span style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,letterSpacing:"0.05em",
+            <span className="rl-hd-badges" style={{fontSize:11,fontWeight:700,padding:"4px 12px",borderRadius:20,letterSpacing:"0.05em",
               background:adminMode?"rgba(220,38,38,0.2)":"rgba(255,255,255,0.08)",
               color:adminMode?"#fca5a5":"#9ca3af",border:"1px solid",
               borderColor:adminMode?"rgba(220,38,38,0.4)":"rgba(255,255,255,0.12)"}}>
@@ -1354,7 +1378,7 @@ export default function TikTokShopReporter() {
           </div>
         )}
 
-        <div style={{display:"flex",overflowX:"auto"}}>
+        <div className="rl-tabs" style={{display:"flex",overflowX:"auto"}}>
           {TABS.map(t=>{
             const active=tab===t.id;
             return (
@@ -1372,7 +1396,7 @@ export default function TikTokShopReporter() {
 
       {tab==="alltime" && (
         <>
-          <div style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+          <div className="rl-subhdr" style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
             {visAllTime.length>0 && <>
               <span style={{fontSize:12,color:"#9ca3af"}}><b style={{color:"#111"}}>{visAllTime.length}</b> videos</span>
               <span style={{fontSize:12,color:"#9ca3af"}}>GMV: <b style={{color:"#16a34a"}}>{f$(gmvAt)}</b></span>
@@ -1408,7 +1432,7 @@ export default function TikTokShopReporter() {
 
       {tab==="lastmonth" && (
         <>
-          <div style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+          <div className="rl-subhdr" style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
             {filteredLastMonth.length>0 && <>
               <span style={{fontSize:12,color:"#9ca3af"}}><b style={{color:"#111"}}>{filteredLastMonth.length}</b> videos</span>
               <span style={{fontSize:12,color:"#9ca3af"}}>GMV: <b style={{color:"#16a34a"}}>{f$(gmvLm)}</b></span>
@@ -1443,7 +1467,7 @@ export default function TikTokShopReporter() {
 
       {tab==="creators" && (
         <>
-          <div style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+          <div className="rl-subhdr" style={{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 24px",display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
             {filteredCreators.length>0 && <>
               <span style={{fontSize:12,color:"#9ca3af"}}><b style={{color:"#111"}}>{filteredCreators.length}</b> creators</span>
               <span style={{fontSize:12,color:"#9ca3af"}}>Combined GMV: <b style={{color:"#16a34a"}}>{f$(filteredCreators.reduce((s,c)=>s+c.gmv,0))}</b></span>
@@ -1478,7 +1502,7 @@ export default function TikTokShopReporter() {
 
       <div style={{flex:1,overflowY:"auto"}}>
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"20px"}}>
+      <div className="rl-page" style={{maxWidth:1100,margin:"0 auto",padding:"20px"}}>
 
         {tab==="alltime" && (
           visAllTime.length===0
