@@ -413,10 +413,10 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
-// Upsert rows in chunks of 500 to avoid PostgREST payload limits and handle
-// duplicate IDs gracefully. Returns true on full success, false if any chunk fails.
+// Upsert rows in chunks to avoid PostgREST payload limits. Returns true on
+// full success, false (with console error) if any chunk fails.
 async function upsertReports(rows: Record<string, unknown>[]): Promise<boolean> {
-  const CHUNK = 500;
+  const CHUNK = 100;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const { error } = await supabase.from('tiktok_reports').upsert(rows.slice(i, i + CHUNK), { onConflict: 'id' });
     if (error) { console.error('upsertReports chunk error:', error); return false; }
@@ -798,8 +798,10 @@ export default function TikTokShopReporter() {
     setPublishing(true);
     const now = new Date().toISOString();
 
-    const toDbRow = (r: VideoRow, pubSource: string) => ({
-      id: `pub_${r.id}`,
+    // Use position-based pub IDs so rows with duplicate videoIds never conflict
+    // within a chunk regardless of which ID format the source rows use.
+    const toDbRow = (r: VideoRow, pubSource: string, idx: number) => ({
+      id: `${pubSource}_${r.videoId||"x"}_${idx+1}`,
       source: pubSource,
       video_id:      r.videoId,
       video_link:    r.videoLink,
@@ -820,11 +822,20 @@ export default function TikTokShopReporter() {
       rank:          r.rank,
     });
 
-    // Replace all published video snapshots
-    await supabase.from('tiktok_reports').delete().in('source', ['pub_alltime','pub_lastmonth','pub_inhouse']);
-    if (allTime.length)   await upsertReports(allTime.map(r   => toDbRow(r,'pub_alltime') as Record<string,unknown>));
-    if (lastMonth.length) await upsertReports(lastMonth.map(r => toDbRow(r,'pub_lastmonth') as Record<string,unknown>));
-    if (inhouse.length)   await upsertReports(inhouse.map(r   => toDbRow(r,'pub_inhouse') as Record<string,unknown>));
+    // Update each published source independently so uploading one CSV never
+    // wipes another source that wasn't re-uploaded this session.
+    if (allTime.length) {
+      await supabase.from('tiktok_reports').delete().eq('source', 'pub_alltime');
+      await upsertReports(allTime.map((r, i) => toDbRow(r, 'pub_alltime', i) as Record<string, unknown>));
+    }
+    if (lastMonth.length) {
+      await supabase.from('tiktok_reports').delete().eq('source', 'pub_lastmonth');
+      await upsertReports(lastMonth.map((r, i) => toDbRow(r, 'pub_lastmonth', i) as Record<string, unknown>));
+    }
+    if (inhouse.length) {
+      await supabase.from('tiktok_reports').delete().eq('source', 'pub_inhouse');
+      await upsertReports(inhouse.map((r, i) => toDbRow(r, 'pub_inhouse', i) as Record<string, unknown>));
+    }
 
     // Publish filters and hidden-video list
     const hiddenArr = JSON.stringify(Array.from(hiddenIds));
@@ -836,9 +847,9 @@ export default function TikTokShopReporter() {
     ]);
 
     // Sync local pub state
-    setPubAllTime(allTime.map(r   => ({...r, id:`pub_${r.id}`, source:'pub_alltime'})));
-    setPubLastMonth(lastMonth.map(r => ({...r, id:`pub_${r.id}`, source:'pub_lastmonth'})));
-    setPubInhouse(inhouse.map(r   => ({...r, id:`pub_${r.id}`, source:'pub_inhouse'})));
+    setPubAllTime(allTime.map((r, i) => ({...r, id:`pub_alltime_${r.videoId||"x"}_${i+1}`, source:'pub_alltime'})));
+    setPubLastMonth(lastMonth.map((r, i) => ({...r, id:`pub_lastmonth_${r.videoId||"x"}_${i+1}`, source:'pub_lastmonth'})));
+    setPubInhouse(inhouse.map((r, i)   => ({...r, id:`pub_inhouse_${r.videoId||"x"}_${i+1}`,   source:'pub_inhouse'})));
     setPubAt(savedAt);
     setPubLm(savedLm);
     setPubCr(savedCr);
