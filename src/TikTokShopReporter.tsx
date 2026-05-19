@@ -411,6 +411,17 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 
+// Upsert rows in chunks of 500 to avoid PostgREST payload limits and handle
+// duplicate IDs gracefully. Returns true on full success, false if any chunk fails.
+async function upsertReports(rows: Record<string, unknown>[]): Promise<boolean> {
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await supabase.from('tiktok_reports').upsert(rows.slice(i, i + CHUNK), { onConflict: 'id' });
+    if (error) { console.error('upsertReports chunk error:', error); return false; }
+  }
+  return true;
+}
+
 export default function TikTokShopReporter() {
 
   const [tab,       setTab]       = useState("alltime");
@@ -809,9 +820,9 @@ export default function TikTokShopReporter() {
 
     // Replace all published video snapshots
     await supabase.from('tiktok_reports').delete().in('source', ['pub_alltime','pub_lastmonth','pub_inhouse']);
-    if (allTime.length)   await supabase.from('tiktok_reports').insert(allTime.map(r   => toDbRow(r,'pub_alltime')));
-    if (lastMonth.length) await supabase.from('tiktok_reports').insert(lastMonth.map(r => toDbRow(r,'pub_lastmonth')));
-    if (inhouse.length)   await supabase.from('tiktok_reports').insert(inhouse.map(r   => toDbRow(r,'pub_inhouse')));
+    if (allTime.length)   await upsertReports(allTime.map(r   => toDbRow(r,'pub_alltime') as Record<string,unknown>));
+    if (lastMonth.length) await upsertReports(lastMonth.map(r => toDbRow(r,'pub_lastmonth') as Record<string,unknown>));
+    if (inhouse.length)   await upsertReports(inhouse.map(r   => toDbRow(r,'pub_inhouse') as Record<string,unknown>));
 
     // Publish filters and hidden-video list
     const hiddenArr = JSON.stringify(Array.from(hiddenIds));
@@ -881,29 +892,29 @@ export default function TikTokShopReporter() {
 
         // Store raw CSV values in DB (overrides live only in tiktok_overrides)
         await supabase.from('tiktok_reports').delete().eq('source', upType);
-        await supabase.from('tiktok_reports').insert(
-          rawRecs.map(r => ({
-            id:             r.id,
-            source:         r.source,
-            video_id:       r.videoId,
-            video_link:     r.videoLink,
-            creator:        r.creator,
-            revenue:        r.revenue,
-            items_sold:     r.itemsSold,
-            views:          r.views,
-            likes:          r.likes,
-            comments:       r.comments,
-            description:    r.description,
-            hashtags:       r.hashtags,
-            product:        r.product,
-            date_posted:    r.datePosted,
-            audio_hook:     r.audioHook,      // raw CSV value only
-            selling_points: r.sellingPoints,  // raw CSV value only
-            key_idea:       r.keyIdea,        // raw CSV value only
-            transcript:     r.transcript,
-            rank:           r.rank,
-          }))
-        );
+        const dbRows = rawRecs.map(r => ({
+          id:             r.id,
+          source:         r.source,
+          video_id:       r.videoId,
+          video_link:     r.videoLink,
+          creator:        r.creator,
+          revenue:        r.revenue,
+          items_sold:     r.itemsSold,
+          views:          r.views,
+          likes:          r.likes,
+          comments:       r.comments,
+          description:    r.description,
+          hashtags:       r.hashtags,
+          product:        r.product,
+          date_posted:    r.datePosted,
+          audio_hook:     r.audioHook,
+          selling_points: r.sellingPoints,
+          key_idea:       r.keyIdea,
+          transcript:     r.transcript,
+          rank:           r.rank,
+        }));
+        const saved = await upsertReports(dbRows);
+        if (!saved) { alert('Warning: some video rows may not have saved to the database. Please try uploading again.'); }
 
         // Apply saved overrides to local state so the UI reflects edits immediately
         const recs = applyOverrides(rawRecs, freshOverrides);
