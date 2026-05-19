@@ -169,11 +169,11 @@ const applyOverrides = (rows: VideoRow[], oMap: Map<string, Override>): VideoRow
 
 const buildXLSX = (at: VideoRow[], lm: VideoRow[], creators: CreatorSummary[]) => {
   const wb = XLSX.utils.book_new();
-  const vH = ["#","Creator","Video URL","Revenue ($)","Items Sold","Views","Likes","Comments","Product","Description","Hashtags","Visual Hook","Text Hook","Audio Hook","Video Length","CTA","Selling Points"];
-  const vR = (r: VideoRow, i: number): (string|number)[] => [i+1,r.creator,r.videoLink,r.revenue,r.itemsSold,r.views,r.likes,r.comments,r.product,r.description,r.hashtags,r.visualHook,r.textHook,r.audioHook,r.videoLength,r.cta,r.sellingPoints];
+  const vH = ["#","Creator","Video URL","Revenue ($)","Items Sold","Views","Likes","Comments","Product","Description","Hashtags","Visual Hook","Text Hook","Audio Hook","Video Length","CTA","Selling Points","Transcript"];
+  const vR = (r: VideoRow, i: number): (string|number)[] => [i+1,r.creator,r.videoLink,r.revenue,r.itemsSold,r.views,r.likes,r.comments,r.product,r.description,r.hashtags,r.visualHook,r.textHook,r.audioHook,r.videoLength,r.cta,r.sellingPoints,r.transcript||""];
   const mkSheet = (rows: VideoRow[], name: string) => {
     const ws = XLSX.utils.aoa_to_sheet([vH,...rows.map((r,i)=>vR(r,i))]);
-    ws["!cols"] = [4,18,30,12,10,12,10,10,28,40,22,22,22,16,12,30,40].map(w=>({wch:w}));
+    ws["!cols"] = [4,18,30,12,10,12,10,10,28,40,22,22,22,16,12,30,40,60].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,ws,name);
   };
   mkSheet(at,"All-Time Affiliate"); mkSheet(lm,"Last Month Affiliate");
