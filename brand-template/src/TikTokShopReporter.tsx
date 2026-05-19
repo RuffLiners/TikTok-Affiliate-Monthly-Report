@@ -1388,6 +1388,11 @@ export default function TikTokShopReporter() {
       <style>{`
   .rl-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .rl-tabs::-webkit-scrollbar{display:none}
+  @media(min-width:900px){
+    .rl-two-col{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:16px!important;align-items:start!important}
+    .rl-two-col>*{margin-bottom:0!important}
+    .rl-hooks-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:28px!important;align-items:start!important}
+  }
   @media(max-width:639px){
     .rl-header{padding:10px 12px 0!important}
     .rl-hd-date{display:none!important}
@@ -1622,89 +1627,91 @@ export default function TikTokShopReporter() {
 
       <div style={{flex:1,overflowY:"auto"}}>
 
-      <div className="rl-page" style={{maxWidth:1100,margin:"0 auto",padding:"20px"}}>
+      <div className="rl-page" style={{maxWidth:1400,margin:"0 auto",padding:"20px"}}>
 
         {tab==="alltime" && (
           visAllTime.length===0
             ? <Empty msg='Click "Update Reports" above and upload the All-Time export from app.euka.ai/videos'/>
-            : <>
+            : <div className="rl-two-col">
                 {slicedAt.map(r=><VideoCard key={r.id} r={r} showFilter={adminMode} {...cardProps}/>)}
                 {pageAt<visAllTime.length && (
-                  <div style={{textAlign:"center",padding:"16px 0"}}>
+                  <div style={{gridColumn:"1/-1",textAlign:"center",padding:"16px 0"}}>
                     <button onClick={()=>setPageAt(n=>n+20)}
                       style={{padding:"10px 28px",background:"#fff",border:"1px solid #d1d5db",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,color:"#374151",fontWeight:500}}>
                       Show more ({visAllTime.length-pageAt} remaining)
                     </button>
                   </div>
                 )}
-              </>
+              </div>
         )}
 
         {tab==="lastmonth" && (
           filteredLastMonth.length===0
             ? <Empty msg='Click "Update Reports" above and upload the Last Month export from app.euka.ai/videos'/>
-            : <>
+            : <div className="rl-two-col">
                 {slicedLm.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)}
                 {pageLm<filteredLastMonth.length && (
-                  <div style={{textAlign:"center",padding:"16px 0"}}>
+                  <div style={{gridColumn:"1/-1",textAlign:"center",padding:"16px 0"}}>
                     <button onClick={()=>setPageLm(n=>n+20)}
                       style={{padding:"10px 28px",background:"#fff",border:"1px solid #d1d5db",borderRadius:10,cursor:"pointer",fontFamily:"inherit",fontSize:13,color:"#374151",fontWeight:500}}>
                       Show more ({filteredLastMonth.length-pageLm} remaining)
                     </button>
                   </div>
                 )}
-              </>
+              </div>
         )}
 
         {tab==="inhouse" && (
           visInhouse.length===0
             ? <Empty msg="In-House Content report source TBD — upload when available"/>
-            : visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)
+            : <div className="rl-two-col">{visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)}</div>
         )}
 
         {tab==="creators" && (
           filteredCreators.length===0
             ? <Empty msg='Upload the All-Time report first — Top Creators are computed from that data'/>
-            : filteredCreators.map((c,i)=><CreatorCard key={c.creator} c={c} idx={i}/>)
+            : <div className="rl-two-col">{filteredCreators.map((c,i)=><CreatorCard key={c.creator} c={c} idx={i}/>)}</div>
         )}
 
         {tab==="hooks" && (
           topVisualHooks.length===0 && topTextHooks.length===0 && topAudioHooks.length===0 && topCTAs.length===0 && topSellingPoints.length===0
             ? <Empty msg='Upload the All-Time report first — Hooks, CTAs, and Selling Points are computed from that data'/>
-            : <div style={{display:"flex",flexDirection:"column",gap:0}}>
-                {/* ── Hooks ── */}
-                <div style={{marginBottom:8}}>
-                  <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>🪝 Hooks</div>
-                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 3 per type by cumulative GMV across all all-time videos</div>
+            : <div className="rl-hooks-grid">
+                {/* ── Left col: Hooks ── */}
+                <div>
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>🪝 Hooks</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 3 per type by cumulative GMV across all all-time videos</div>
+                  </div>
+                  <HookSection hooks={topVisualHooks} icon="🎬" title="Visual Hooks" accent="#7c3aed"/>
+                  <HookSection hooks={topTextHooks}   icon="🎣" title="Text Hooks"   accent="#0891b2"/>
+                  <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
                 </div>
-                <HookSection hooks={topVisualHooks} icon="🎬" title="Visual Hooks" accent="#7c3aed"/>
-                <HookSection hooks={topTextHooks}   icon="🎣" title="Text Hooks"   accent="#0891b2"/>
-                <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
 
-                {/* ── CTAs ── */}
-                <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
-                  <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
-                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
+                {/* ── Right col: CTAs + Selling Points ── */}
+                <div>
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
+                  </div>
+                  {topCTAs.length>0
+                    ? <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626"/>
+                    : <div style={{background:"#fff",borderRadius:12,border:"1px dashed #d1d5db",padding:"28px 20px",textAlign:"center",marginBottom:28,color:"#9ca3af",fontSize:13}}>
+                        No CTA data yet — edit videos and fill in the <strong style={{color:"#374151"}}>Call to Action</strong> field to see top CTAs here.
+                      </div>
+                  }
+                  {topSellingPoints.length>0 && (
+                    <>
+                      <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
+                        <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>✅ Best Selling Points</div>
+                        <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 5 individual selling points by cumulative GMV, grouped per product</div>
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                        {topSellingPoints.map((sp,i)=><SellingPointRow key={`${sp.product}::${sp.point}`} sp={sp} rank={i}/>)}
+                      </div>
+                    </>
+                  )}
                 </div>
-                {topCTAs.length>0
-                  ? <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626"/>
-                  : <div style={{background:"#fff",borderRadius:12,border:"1px dashed #d1d5db",padding:"28px 20px",textAlign:"center",marginBottom:28,color:"#9ca3af",fontSize:13}}>
-                      No CTA data yet — edit videos and fill in the <strong style={{color:"#374151"}}>Call to Action</strong> field to see top CTAs here.
-                    </div>
-                }
-
-                {/* ── Selling Points ── */}
-                {topSellingPoints.length>0 && (
-                  <>
-                    <div style={{borderTop:"2px solid #e5e7eb",marginTop:8,paddingTop:28,marginBottom:8}}>
-                      <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>✅ Best Selling Points</div>
-                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top 5 individual selling points by cumulative GMV, grouped per product</div>
-                    </div>
-                    <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                      {topSellingPoints.map((sp,i)=><SellingPointRow key={`${sp.product}::${sp.point}`} sp={sp} rank={i}/>)}
-                    </div>
-                  </>
-                )}
               </div>
         )}
       </div>
