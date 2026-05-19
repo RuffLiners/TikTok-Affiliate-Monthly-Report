@@ -1195,7 +1195,7 @@ export default function TikTokShopReporter() {
           <div style={{fontWeight:800,fontSize:16,color:"#16a34a",flexShrink:0}}>{f$(sp.totalGmv)}</div>
         </div>
         {/* Stats row */}
-        <div style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
+        <div className="rl-stats" style={{display:"flex",gap:0,borderBottom:"1px solid #f0f0f0"}}>
           {[
             ["📹","Total Videos",    String(sp.totalVideos)],
             ["👁", "Total Views",     fK(sp.totalViews)],
@@ -1228,7 +1228,7 @@ export default function TikTokShopReporter() {
             <div style={{fontSize:10,fontWeight:700,color:"#16a34a",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>
               🏆 Top Video{sp.topVideos.length>1?"s":""}
             </div>
-            <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div className="rl-vid-row" style={{display:"flex",gap:16,flexWrap:"wrap"}}>
               {sp.topVideos.map((v,i) => <VideoTile key={v.id||i} v={v} pos={i}/>)}
             </div>
           </div>
