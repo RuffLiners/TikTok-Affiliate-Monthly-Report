@@ -1068,7 +1068,23 @@ export default function TikTokShopReporter() {
     setOverridesMap(prev => new Map(prev).set(r.videoId, fields));
     // Apply to every row with the same videoId across all pages
     const upd = (rs: VideoRow[]) => rs.map(rec => rec.videoId===r.videoId ? {...rec,...fields} : rec);
-    setAllTime(upd); setLastMonth(upd); setInhouse(upd);
+    const updatedAllTime = allTime.map(rec => rec.videoId===r.videoId ? {...rec,...fields} : rec);
+    setAllTime(updatedAllTime); setLastMonth(upd); setInhouse(upd);
+
+    // Recompute hook/CTA/SP sections from updated rows (creators preserved from full-dataset agg)
+    if (atAgg) {
+      const newAgg = {
+        ...atAgg,
+        visualHooks:   buildTopHooks(updatedAllTime, 'visualHook'),
+        textHooks:     buildTopHooks(updatedAllTime, 'textHook'),
+        audioHooks:    buildTopAudioHooks(updatedAllTime),
+        ctas:          buildTopHooks(updatedAllTime, 'cta'),
+        sellingPoints: buildTopSellingPoints(updatedAllTime),
+      };
+      setAtAgg(newAgg);
+      supabase.from('tiktok_hub_settings').upsert({ key: 'at_agg', value: JSON.stringify(newAgg), updated_at: new Date().toISOString() });
+    }
+
     setEditingId(null);
   };
 
