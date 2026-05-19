@@ -465,6 +465,15 @@ export default function TikTokShopReporter() {
   const [pubLastMonth, setPubLastMonth] = useState<VideoRow[]>([]);
   const [pubInhouse,   setPubInhouse]   = useState<VideoRow[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [atAgg, setAtAgg] = useState<{
+    creators: CreatorSummary[];
+    visualHooks: HookSummary[];
+    textHooks: HookSummary[];
+    audioHooks: HookSummary[];
+    ctas: HookSummary[];
+    sellingPoints: SellingPointSummary[];
+  } | null>(null);
+  const [pubAtAgg, setPubAtAgg] = useState<typeof atAgg>(null);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -516,6 +525,8 @@ export default function TikTokShopReporter() {
         setSavedCr(c.scr||0); setDraftCr(c.scr||"");
         setPubAt(c.npat||0); setPubLm(c.nplm||0); setPubCr(c.npcr||0);
         setLastImported(c.li||"");
+        if (c.atAgg) setAtAgg(c.atAgg);
+        if (c.pubAtAgg) setPubAtAgg(c.pubAtAgg);
         setDataLoading(false);
       }
     } catch {}
@@ -590,6 +601,11 @@ export default function TikTokShopReporter() {
         }
       });
 
+      const atAggSetting = settings?.find((s: {key:string,value:string}) => s.key === 'at_agg');
+      if (atAggSetting) { try { setAtAgg(JSON.parse(atAggSetting.value)); } catch {} }
+      const pubAtAggSetting = settings?.find((s: {key:string,value:string}) => s.key === 'pub_at_agg');
+      if (pubAtAggSetting) { try { setPubAtAgg(JSON.parse(pubAtAggSetting.value)); } catch {} }
+
       const at   = (atRows    || []).sort(srt).map(r => toRow(r, newMap));
       const lm   = (lmRows    || []).sort(srt).map(r => toRow(r, newMap));
       const inh  = (inhRows   || []).sort(srt).map(r => toRow(r, newMap));
@@ -603,12 +619,15 @@ export default function TikTokShopReporter() {
 
       // Persist to sessionStorage so next load is instant
       try {
+        const atAggVal = atAggSetting ? (() => { try { return JSON.parse(atAggSetting.value); } catch { return null; } })() : null;
+        const pubAtAggVal = pubAtAggSetting ? (() => { try { return JSON.parse(pubAtAggSetting.value); } catch { return null; } })() : null;
         sessionStorage.setItem(CACHE_KEY, JSON.stringify({
           at, lm, inh, pat, plm, pinh,
           hid: Array.from(hiddenSet),
           phid,
           omap: Array.from(newMap.entries()),
           sat, slm, scr, npat, nplm, npcr, li,
+          atAgg: atAggVal, pubAtAgg: pubAtAggVal,
         }));
       } catch {}
     };
@@ -687,14 +706,20 @@ export default function TikTokShopReporter() {
     [inhouse, adminMode, pubInhouse, pubHiddenIds]
   );
 
-  const filteredCreators = useMemo(
-    () => {
-      const src = adminMode ? creators : pubCreators;
-      const threshold = adminMode ? savedCr : pubCr;
-      return threshold > 0 ? src.filter(c => c.gmv >= threshold) : src;
-    },
-    [creators, pubCreators, adminMode, savedCr, pubCr]
-  );
+  const filteredCreators = useMemo(() => {
+    const aggSrc = adminMode ? atAgg?.creators : pubAtAgg?.creators;
+    const rowSrc = adminMode ? creators : pubCreators;
+    const src = aggSrc || rowSrc;
+    // If using agg creators, update videosLastMonth from current lastMonth state
+    const lmRows = adminMode ? lastMonth : pubLastMonth;
+    const enhanced = aggSrc ? src.map(c => {
+      const key = c.creator.toLowerCase().trim();
+      const lmVids = lmRows.filter(v => v.creator.toLowerCase().trim() === key);
+      return { ...c, videosLastMonth: lmVids.length, videosWithGmvLastMonth: lmVids.filter(v => v.revenue > 0).length };
+    }) : src;
+    const threshold = adminMode ? savedCr : pubCr;
+    return threshold > 0 ? enhanced.filter(c => c.gmv >= threshold) : enhanced;
+  }, [atAgg, pubAtAgg, creators, pubCreators, lastMonth, pubLastMonth, adminMode, savedCr, pubCr]);
 
   const buildTopHooks = (videos: VideoRow[], field: 'visualHook' | 'textHook' | 'cta'): HookSummary[] => {
     const map: Record<string, { hookText: string; videos: VideoRow[] }> = {};
@@ -771,11 +796,11 @@ export default function TikTokShopReporter() {
   };
 
   const src = adminMode ? allTime : pubAllTime;
-  const topVisualHooks   = useMemo(() => buildTopHooks(src, 'visualHook'),  [src]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topTextHooks     = useMemo(() => buildTopHooks(src, 'textHook'),    [src]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topAudioHooks    = useMemo(() => buildTopAudioHooks(src),           [src]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topCTAs          = useMemo(() => buildTopHooks(src, 'cta'),         [src]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topVisualHooks   = useMemo(() => (adminMode ? atAgg?.visualHooks : pubAtAgg?.visualHooks) || buildTopHooks(src, 'visualHook'),  [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topTextHooks     = useMemo(() => (adminMode ? atAgg?.textHooks : pubAtAgg?.textHooks) || buildTopHooks(src, 'textHook'),    [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topAudioHooks    = useMemo(() => (adminMode ? atAgg?.audioHooks : pubAtAgg?.audioHooks) || buildTopAudioHooks(src),           [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topCTAs          = useMemo(() => (adminMode ? atAgg?.ctas : pubAtAgg?.ctas) || buildTopHooks(src, 'cta'),         [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topSellingPoints = useMemo(() => (adminMode ? atAgg?.sellingPoints : pubAtAgg?.sellingPoints) || buildTopSellingPoints(src),        [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── filter helpers ───────────────────────────────────────────────────────────
 
@@ -826,7 +851,7 @@ export default function TikTokShopReporter() {
     // wipes another source that wasn't re-uploaded this session.
     if (allTime.length) {
       await supabase.from('tiktok_reports').delete().eq('source', 'pub_alltime');
-      await upsertReports(allTime.map((r, i) => toDbRow(r, 'pub_alltime', i) as Record<string, unknown>));
+      await upsertReports(allTime.slice(0, 500).map((r, i) => toDbRow(r, 'pub_alltime', i) as Record<string, unknown>));
     }
     if (lastMonth.length) {
       await supabase.from('tiktok_reports').delete().eq('source', 'pub_lastmonth');
@@ -835,6 +860,12 @@ export default function TikTokShopReporter() {
     if (inhouse.length) {
       await supabase.from('tiktok_reports').delete().eq('source', 'pub_inhouse');
       await upsertReports(inhouse.map((r, i) => toDbRow(r, 'pub_inhouse', i) as Record<string, unknown>));
+    }
+
+    // Publish aggregations if available
+    if (atAgg) {
+      await supabase.from('tiktok_hub_settings').upsert({ key: 'pub_at_agg', value: JSON.stringify(atAgg), updated_at: now });
+      setPubAtAgg(atAgg);
     }
 
     // Publish filters and hidden-video list
@@ -847,7 +878,7 @@ export default function TikTokShopReporter() {
     ]);
 
     // Sync local pub state
-    setPubAllTime(allTime.map((r, i) => ({...r, id:`pub_alltime_${r.videoId||"x"}_${i+1}`, source:'pub_alltime'})));
+    setPubAllTime(allTime.slice(0, 500).map((r, i) => ({...r, id:`pub_alltime_${r.videoId||"x"}_${i+1}`, source:'pub_alltime'})));
     setPubLastMonth(lastMonth.map((r, i) => ({...r, id:`pub_lastmonth_${r.videoId||"x"}_${i+1}`, source:'pub_lastmonth'})));
     setPubInhouse(inhouse.map((r, i)   => ({...r, id:`pub_inhouse_${r.videoId||"x"}_${i+1}`,   source:'pub_inhouse'})));
     setPubAt(savedAt);
@@ -903,9 +934,24 @@ export default function TikTokShopReporter() {
         // Parse raw CSV values — no overrides baked in so tiktok_reports stays clean
         const rawRecs = parseCSV(e.target!.result as string, upType);
 
-        // Store raw CSV values in DB (overrides live only in tiktok_overrides)
+        if (upType === 'alltime') {
+          // Compute aggregations from ALL rows before slicing for DB storage
+          const allRecs = applyOverrides(rawRecs, freshOverrides);
+          const aggCreators = buildCreators(allRecs, lastMonth, inhouse);
+          const aggVisual = buildTopHooks(allRecs, 'visualHook');
+          const aggText = buildTopHooks(allRecs, 'textHook');
+          const aggAudio = buildTopAudioHooks(allRecs);
+          const aggCtas = buildTopHooks(allRecs, 'cta');
+          const aggSPs = buildTopSellingPoints(allRecs);
+          const newAgg = { creators: aggCreators, visualHooks: aggVisual, textHooks: aggText, audioHooks: aggAudio, ctas: aggCtas, sellingPoints: aggSPs };
+          setAtAgg(newAgg);
+          await supabase.from('tiktok_hub_settings').upsert({ key: 'at_agg', value: JSON.stringify(newAgg), updated_at: new Date().toISOString() });
+        }
+
+        // Store raw CSV values in DB — for alltime, limit to top 5000 rows
         await supabase.from('tiktok_reports').delete().eq('source', upType);
-        const dbRows = rawRecs.map(r => ({
+        const dbRawRecs = upType === 'alltime' ? rawRecs.slice(0, 5000) : rawRecs;
+        const dbRows = dbRawRecs.map(r => ({
           id:             r.id,
           source:         r.source,
           video_id:       r.videoId,
@@ -930,7 +976,9 @@ export default function TikTokShopReporter() {
         if (!saved) { alert('Warning: some video rows may not have saved to the database. Please try uploading again.'); }
 
         // Apply saved overrides to local state so the UI reflects edits immediately
-        const recs = applyOverrides(rawRecs, freshOverrides);
+        // For alltime, limit state to 5000 rows for memory efficiency
+        const stateRecs = upType === 'alltime' ? rawRecs.slice(0, 5000) : rawRecs;
+        const recs = applyOverrides(stateRecs, freshOverrides);
         if (upType==="alltime")   { setAllTime(recs);   setPageAt(20); }
         if (upType==="lastmonth") { setLastMonth(recs); setPageLm(20); }
         if (upType==="inhouse")   setInhouse(recs);
