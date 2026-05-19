@@ -1,14 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="7" fill="#111111"/>
-
-  <!-- Single centered paw print -->
-  <g transform="translate(16,18)">
-    <!-- Main pad -->
-    <path d="M 0,-6 C 4,-7.5 9,-4.5 9,0.5 C 9,5.5 5.5,9 0,9 C -5.5,9 -9,5.5 -9,0.5 C -9,-4.5 -4,-7.5 0,-6 Z" fill="white"/>
-    <!-- 4 toe pads -->
-    <ellipse cx="-6.5" cy="-11"  rx="2.4" ry="3.2" transform="rotate(-20,-6.5,-11)"  fill="white"/>
-    <ellipse cx="-2.2" cy="-13"  rx="2.4" ry="3.2" transform="rotate(-7,-2.2,-13)"   fill="white"/>
-    <ellipse cx="2.2"  cy="-13"  rx="2.4" ry="3.2" transform="rotate(7,2.2,-13)"     fill="white"/>
-    <ellipse cx="6.5"  cy="-11"  rx="2.4" ry="3.2" transform="rotate(20,6.5,-11)"    fill="white"/>
-  </g>
+  <text x="16" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="15" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-0.5">RL</text>
 </svg>
