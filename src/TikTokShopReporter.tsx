@@ -798,12 +798,14 @@ export default function TikTokShopReporter() {
       .slice(0, 5);
   };
 
+  // Always compute live from the current rows so manual edits (overrides) are immediately
+  // reflected without waiting for a CSV re-upload or atAgg recompute.
   const src = adminMode ? allTime : pubAllTime;
-  const topVisualHooks   = useMemo(() => (adminMode ? atAgg?.visualHooks : pubAtAgg?.visualHooks) || buildTopHooks(src, 'visualHook'),  [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topTextHooks     = useMemo(() => (adminMode ? atAgg?.textHooks : pubAtAgg?.textHooks) || buildTopHooks(src, 'textHook'),    [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topAudioHooks    = useMemo(() => (adminMode ? atAgg?.audioHooks : pubAtAgg?.audioHooks) || buildTopAudioHooks(src),           [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topCTAs          = useMemo(() => (adminMode ? atAgg?.ctas : pubAtAgg?.ctas) || buildTopHooks(src, 'cta'),         [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topSellingPoints = useMemo(() => (adminMode ? atAgg?.sellingPoints : pubAtAgg?.sellingPoints) || buildTopSellingPoints(src),        [src, atAgg, pubAtAgg, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topVisualHooks   = useMemo(() => buildTopHooks(src, 'visualHook'),  [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topTextHooks     = useMemo(() => buildTopHooks(src, 'textHook'),    [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topAudioHooks    = useMemo(() => buildTopAudioHooks(src),           [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topCTAs          = useMemo(() => buildTopHooks(src, 'cta'),         [src]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── filter helpers ───────────────────────────────────────────────────────────
 
