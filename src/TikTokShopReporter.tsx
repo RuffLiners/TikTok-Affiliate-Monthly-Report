@@ -465,6 +465,8 @@ export default function TikTokShopReporter() {
   const [pubLastMonth, setPubLastMonth] = useState<VideoRow[]>([]);
   const [pubInhouse,   setPubInhouse]   = useState<VideoRow[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState("");
   const [atAgg, setAtAgg] = useState<{
     creators: CreatorSummary[];
     visualHooks: HookSummary[];
@@ -707,7 +709,8 @@ export default function TikTokShopReporter() {
   );
 
   const filteredCreators = useMemo(() => {
-    const aggSrc = adminMode ? atAgg?.creators : pubAtAgg?.creators;
+    // In creator mode fall back to atAgg when pubAtAgg hasn't been published yet
+    const aggSrc = adminMode ? atAgg?.creators : (pubAtAgg?.creators ?? atAgg?.creators);
     const rowSrc = adminMode ? creators : pubCreators;
     const src = aggSrc || rowSrc;
     // If using agg creators, update videosLastMonth from current lastMonth state
@@ -891,11 +894,27 @@ export default function TikTokShopReporter() {
 
   // ── file handling ────────────────────────────────────────────────────────────
 
+  const REQUIRED_CSV_COLS = ['URL', 'Creator', 'Video Revenue', 'Items Sold', 'Views Count'];
+
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     Array.from(files).forEach(f => {
       const reader = new FileReader();
-      reader.onload = async e => {
+      reader.onload = async e => { try {
+        setUploading(true);
+        setUploadStep("Validating file format…");
+        // Validate CSV columns before touching any existing data
+        const text = e.target!.result as string;
+        const firstLine = text.replace(/^﻿/, "").split('\n')[0] || "";
+        const missingCols = REQUIRED_CSV_COLS.filter(col => !firstLine.includes(col));
+        if (missingCols.length > 0) {
+          setUploading(false);
+          setUploadStep("");
+          alert(`This file doesn't look like a TikTok report. Missing columns: ${missingCols.join(', ')}.\n\nNo data was changed.`);
+          return;
+        }
+
+        setUploadStep("Loading saved field edits…");
         // Always fetch the latest saved overrides from the DB before parsing so
         // manually-edited fields are never lost when a CSV is re-uploaded.
         const [
@@ -932,9 +951,11 @@ export default function TikTokShopReporter() {
         setOverridesMap(freshOverrides);
 
         // Parse raw CSV values — no overrides baked in so tiktok_reports stays clean
-        const rawRecs = parseCSV(e.target!.result as string, upType);
+        setUploadStep("Parsing CSV rows…");
+        const rawRecs = parseCSV(text, upType);
 
         if (upType === 'alltime') {
+          setUploadStep(`Computing stats from ${rawRecs.length.toLocaleString()} rows…`);
           // Compute aggregations from ALL rows before slicing for DB storage
           const allRecs = applyOverrides(rawRecs, freshOverrides);
           const aggCreators = buildCreators(allRecs, lastMonth, inhouse);
@@ -949,6 +970,7 @@ export default function TikTokShopReporter() {
         }
 
         // Store raw CSV values in DB — for alltime, limit to top 5000 rows
+        setUploadStep("Saving to database…");
         await supabase.from('tiktok_reports').delete().eq('source', upType);
         const dbRawRecs = upType === 'alltime' ? rawRecs.slice(0, 5000) : rawRecs;
         const dbRows = dbRawRecs.map(r => ({
@@ -986,9 +1008,16 @@ export default function TikTokShopReporter() {
         const dateStr = `${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${now.getFullYear()}`;
         await supabase.from('tiktok_hub_settings').upsert({key:'last_imported',value:dateStr,updated_at:new Date().toISOString()});
         setLastImported(dateStr);
+        setUploading(false);
+        setUploadStep("");
         setShowUp(false);
         sessionStorage.removeItem('rl_data_v1');
-      };
+      } catch (err) {
+        setUploading(false);
+        setUploadStep("");
+        alert('Upload failed unexpectedly. No data was changed. Please try again.');
+        console.error('handleFiles error:', err);
+      } };
       reader.readAsText(f);
     });
   };
@@ -1664,6 +1693,17 @@ export default function TikTokShopReporter() {
 
       </div>{/* end scrollable content */}
 
+
+{uploading && (
+  <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{background:"#fff",borderRadius:16,padding:"32px 40px",minWidth:300,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+      <style>{`@keyframes rl-spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{width:44,height:44,border:"4px solid #e5e7eb",borderTopColor:"#16a34a",borderRadius:"50%",animation:"rl-spin 0.8s linear infinite",margin:"0 auto 20px"}}/>
+      <div style={{fontWeight:700,fontSize:16,color:"#111",marginBottom:8}}>Uploading Report…</div>
+      <div style={{fontSize:13,color:"#6b7280"}}>{uploadStep}</div>
+    </div>
+  </div>
+)}
 
 {showLoginModal && (
         <div
