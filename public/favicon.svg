@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="7" fill="#111111"/>
+
+  <!-- Left paw -->
+  <!-- Main pad -->
+  <ellipse cx="8.5" cy="24" rx="4.2" ry="3.6" fill="white"/>
+  <!-- Three toe pads -->
+  <ellipse cx="3.8" cy="17.5" rx="1.8" ry="2.3" fill="white"/>
+  <ellipse cx="8.5" cy="15.8" rx="1.8" ry="2.3" fill="white"/>
+  <ellipse cx="13.2" cy="17.5" rx="1.8" ry="2.3" fill="white"/>
+
+  <!-- Right paw -->
+  <!-- Main pad -->
+  <ellipse cx="23.5" cy="24" rx="4.2" ry="3.6" fill="white"/>
+  <!-- Three toe pads -->
+  <ellipse cx="18.8" cy="17.5" rx="1.8" ry="2.3" fill="white"/>
+  <ellipse cx="23.5" cy="15.8" rx="1.8" ry="2.3" fill="white"/>
+  <ellipse cx="28.2" cy="17.5" rx="1.8" ry="2.3" fill="white"/>
+</svg>
