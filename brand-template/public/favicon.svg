@@ -1,25 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="7" fill="#111111"/>
 
-  <!-- Left paw — upper-left, rotated slightly counter-clockwise -->
-  <g transform="translate(9.5,17.5) rotate(-20)">
-    <!-- Main pad: organic rounded blob, wider at top -->
-    <path d="M 0,-5.5 C 3.2,-7 7,-4.5 7.5,-0.5 C 8,3.5 5,7.5 0,7.5 C -5,7.5 -8,3.5 -7.5,-0.5 C -7,-4.5 -3.2,-7 0,-5.5 Z" fill="white"/>
-    <!-- 4 toe pads in arc -->
-    <ellipse cx="-5.2" cy="-9"   rx="1.9" ry="2.5" transform="rotate(-20,-5.2,-9)"   fill="white"/>
-    <ellipse cx="-1.7" cy="-10.8" rx="1.9" ry="2.5" transform="rotate(-7,-1.7,-10.8)" fill="white"/>
-    <ellipse cx="1.7"  cy="-10.8" rx="1.9" ry="2.5" transform="rotate(7,1.7,-10.8)"  fill="white"/>
-    <ellipse cx="5.2"  cy="-9"   rx="1.9" ry="2.5" transform="rotate(20,5.2,-9)"    fill="white"/>
-  </g>
-
-  <!-- Right paw — lower-right, rotated slightly clockwise -->
-  <g transform="translate(23,21.5) rotate(15)">
+  <!-- Single centered paw print -->
+  <g transform="translate(16,18)">
     <!-- Main pad -->
-    <path d="M 0,-4.5 C 2.5,-5.5 5.5,-3.5 6,-0.5 C 6.5,2.8 4,6 0,6 C -4,6 -6.5,2.8 -6,-0.5 C -5.5,-3.5 -2.5,-5.5 0,-4.5 Z" fill="white"/>
-    <!-- 4 toe pads in arc -->
-    <ellipse cx="-4.2" cy="-7.2" rx="1.6" ry="2.1" transform="rotate(-20,-4.2,-7.2)" fill="white"/>
-    <ellipse cx="-1.4" cy="-8.7" rx="1.6" ry="2.1" transform="rotate(-7,-1.4,-8.7)"  fill="white"/>
-    <ellipse cx="1.4"  cy="-8.7" rx="1.6" ry="2.1" transform="rotate(7,1.4,-8.7)"   fill="white"/>
-    <ellipse cx="4.2"  cy="-7.2" rx="1.6" ry="2.1" transform="rotate(20,4.2,-7.2)"  fill="white"/>
+    <path d="M 0,-6 C 4,-7.5 9,-4.5 9,0.5 C 9,5.5 5.5,9 0,9 C -5.5,9 -9,5.5 -9,0.5 C -9,-4.5 -4,-7.5 0,-6 Z" fill="white"/>
+    <!-- 4 toe pads -->
+    <ellipse cx="-6.5" cy="-11"  rx="2.4" ry="3.2" transform="rotate(-20,-6.5,-11)"  fill="white"/>
+    <ellipse cx="-2.2" cy="-13"  rx="2.4" ry="3.2" transform="rotate(-7,-2.2,-13)"   fill="white"/>
+    <ellipse cx="2.2"  cy="-13"  rx="2.4" ry="3.2" transform="rotate(7,2.2,-13)"     fill="white"/>
+    <ellipse cx="6.5"  cy="-11"  rx="2.4" ry="3.2" transform="rotate(20,6.5,-11)"    fill="white"/>
   </g>
 </svg>
