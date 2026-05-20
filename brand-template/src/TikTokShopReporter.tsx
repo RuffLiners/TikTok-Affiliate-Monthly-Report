@@ -450,6 +450,7 @@ export default function TikTokShopReporter() {
   const localOverridesRef = useRef<Map<string, Override>>(new Map());
   const [dataLoading, setDataLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const xlsxImportRef = useRef<HTMLInputElement>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [lastImported, setLastImported] = useState("");
@@ -1093,6 +1094,74 @@ export default function TikTokShopReporter() {
   const cancelEdit = () => setEditingId(null);
   const toggleTranscript = (id: string) => setTranscriptOpen(prev => { const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s; });
 
+  const importXLSX = (file: File) => {
+    setUploading(true);
+    setUploadStep("Reading XLSX file…");
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target!.result as ArrayBuffer), { type: 'array' });
+        // Collect editable fields keyed by videoId across all video sheets
+        const edits = new Map<string, Override>();
+        for (const sheetName of ['All-Time Affiliate', 'Last Month Affiliate', 'In-House Affiliate']) {
+          const ws = wb.Sheets[sheetName];
+          if (!ws) continue;
+          const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
+          rows.forEach(row => {
+            const url = (row['Video URL'] || '').trim();
+            const videoId = (url.match(/\/video\/(\d+)/) || [])[1];
+            if (!videoId) return;
+            const f: Override = {};
+            if (row['Visual Hook']?.trim())    f.visualHook    = row['Visual Hook'].trim();
+            if (row['Text Hook']?.trim())      f.textHook      = row['Text Hook'].trim();
+            if (row['Audio Hook']?.trim())     f.audioHook     = row['Audio Hook'].trim();
+            if (row['Video Length']?.trim())   f.videoLength   = row['Video Length'].trim();
+            if (row['CTA']?.trim())            f.cta           = row['CTA'].trim();
+            if (row['Selling Points']?.trim()) f.sellingPoints = row['Selling Points'].trim();
+            if (Object.keys(f).length > 0) {
+              edits.set(videoId, { ...(edits.get(videoId) || {}), ...f });
+            }
+          });
+        }
+        if (edits.size === 0) {
+          setUploading(false);
+          alert('No editable fields found. Fill in Visual Hook, Text Hook, Audio Hook, Video Length, CTA, or Selling Points columns and try again.');
+          return;
+        }
+        setUploadStep(`Saving ${edits.size} video override${edits.size !== 1 ? 's' : ''}…`);
+        const newMap = new Map(overridesMap);
+        for (const [videoId, fields] of Array.from(edits)) {
+          const merged: Override = { ...(newMap.get(videoId) || {}), ...fields };
+          newMap.set(videoId, merged);
+          localOverridesRef.current.set(videoId, merged);
+          const overrideRow = { report_id: videoId, audio_hook: merged.audioHook, visual_hook: merged.visualHook, text_hook: merged.textHook, video_length: merged.videoLength, cta: merged.cta, selling_points: merged.sellingPoints, key_idea: merged.keyIdea, updated_at: new Date().toISOString() };
+          const { error } = await supabase.from('tiktok_overrides').upsert(overrideRow, { onConflict: 'report_id' });
+          if (error) { await supabase.from('tiktok_overrides').delete().eq('report_id', videoId); await supabase.from('tiktok_overrides').insert(overrideRow); }
+          await supabase.from('tiktok_hub_settings').upsert({ key: `ov_${videoId}`, value: JSON.stringify(merged), updated_at: new Date().toISOString() });
+        }
+        setOverridesMap(newMap);
+        const applyMap = (rows: VideoRow[]) => rows.map(r => {
+          const ov = newMap.get(r.videoId);
+          if (!ov) return r;
+          return { ...r, audioHook: ov.audioHook ?? r.audioHook, visualHook: ov.visualHook ?? r.visualHook, textHook: ov.textHook ?? r.textHook, videoLength: ov.videoLength ?? r.videoLength, cta: ov.cta ?? r.cta, sellingPoints: ov.sellingPoints ?? r.sellingPoints, keyIdea: ov.keyIdea ?? r.keyIdea };
+        });
+        const updatedAllTime = applyMap(allTime);
+        setAllTime(updatedAllTime); setLastMonth(applyMap(lastMonth)); setInhouse(applyMap(inhouse));
+        if (atAgg) {
+          const newAgg = { ...atAgg, visualHooks: buildTopHooks(updatedAllTime, 'visualHook'), textHooks: buildTopHooks(updatedAllTime, 'textHook'), audioHooks: buildTopAudioHooks(updatedAllTime), ctas: buildTopHooks(updatedAllTime, 'cta'), sellingPoints: buildTopSellingPoints(updatedAllTime) };
+          setAtAgg(newAgg);
+          supabase.from('tiktok_hub_settings').upsert({ key: 'at_agg', value: JSON.stringify(newAgg), updated_at: new Date().toISOString() });
+        }
+        setUploading(false);
+        alert(`✓ Updated ${edits.size} video${edits.size !== 1 ? 's' : ''} from XLSX. Changes are live and saved.`);
+      } catch {
+        setUploading(false);
+        alert('Could not read the file. Make sure it was exported from this tool.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   // ── admin filter ─────────────────────────────────────────────────────────────
 
   const toggleHide = async (videoId: string) => {
@@ -1461,6 +1530,12 @@ export default function TikTokShopReporter() {
             </button>
           )}
           {adminMode && (
+            <button onClick={()=>xlsxImportRef.current?.click()}
+              style={{background:"#0891b2",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              📤 Import XLSX
+            </button>
+          )}
+          {adminMode && (
             <button onClick={publishDashboard} disabled={publishing}
               style={{background:publishing?"#5b21b6":"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:publishing?"not-allowed":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,opacity:publishing?0.8:1}}>
               {publishing?"⏳ Publishing…":"🚀 Update Dashboard"}
@@ -1502,6 +1577,7 @@ export default function TikTokShopReporter() {
                 <span>📁</span>
                 <span style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>Drop CSV or click to browse — your notes carry over automatically</span>
                 <input ref={fileRef} type="file" accept=".csv" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
+                <input ref={xlsxImportRef} type="file" accept=".xlsx" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; if(f) importXLSX(f); e.target.value=''; }}/>
               </div>
             </div>
           </div>
