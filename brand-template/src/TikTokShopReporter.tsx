@@ -1106,18 +1106,19 @@ export default function TikTokShopReporter() {
         for (const sheetName of ['All-Time Affiliate', 'Last Month Affiliate', 'In-House Affiliate']) {
           const ws = wb.Sheets[sheetName];
           if (!ws) continue;
-          const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
+          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
           rows.forEach(row => {
-            const url = (row['Video URL'] || '').trim();
+            const s = (v: unknown) => String(v || '').trim();
+            const url = s(row['Video URL']);
             const videoId = (url.match(/\/video\/(\d+)/) || [])[1];
             if (!videoId) return;
             const f: Override = {};
-            if (row['Visual Hook']?.trim())    f.visualHook    = row['Visual Hook'].trim();
-            if (row['Text Hook']?.trim())      f.textHook      = row['Text Hook'].trim();
-            if (row['Audio Hook']?.trim())     f.audioHook     = row['Audio Hook'].trim();
-            if (row['Video Length']?.trim())   f.videoLength   = row['Video Length'].trim();
-            if (row['CTA']?.trim())            f.cta           = row['CTA'].trim();
-            if (row['Selling Points']?.trim()) f.sellingPoints = row['Selling Points'].trim();
+            if (s(row['Visual Hook']))    f.visualHook    = s(row['Visual Hook']);
+            if (s(row['Text Hook']))      f.textHook      = s(row['Text Hook']);
+            if (s(row['Audio Hook']))     f.audioHook     = s(row['Audio Hook']);
+            if (s(row['Video Length']))   f.videoLength   = s(row['Video Length']);
+            if (s(row['CTA']))            f.cta           = s(row['CTA']);
+            if (s(row['Selling Points'])) f.sellingPoints = s(row['Selling Points']);
             if (Object.keys(f).length > 0) {
               edits.set(videoId, { ...(edits.get(videoId) || {}), ...f });
             }
@@ -1577,11 +1578,13 @@ export default function TikTokShopReporter() {
                 <span>📁</span>
                 <span style={{fontSize:12,color:"rgba(255,255,255,0.5)"}}>Drop CSV or click to browse — your notes carry over automatically</span>
                 <input ref={fileRef} type="file" accept=".csv" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
-                <input ref={xlsxImportRef} type="file" accept=".xlsx" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; if(f) importXLSX(f); e.target.value=''; }}/>
               </div>
             </div>
           </div>
         )}
+
+        {/* Hidden XLSX import input — kept outside showUp so it's always mounted */}
+        <input ref={xlsxImportRef} type="file" accept=".xlsx" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; if(f) importXLSX(f); e.target.value=''; }}/>
 
         <div className="rl-tabs" style={{display:"flex",overflowX:"auto"}}>
           {TABS.map(t=>{
