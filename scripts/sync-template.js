@@ -56,6 +56,8 @@ const FILE_SUBS = {
   ],
   'index.html': [
     [/Ruff Liners Creator Hub/g, 'Creator Hub'],
+    // Replace RL initials in the inlined data URI (URL-encoded > and <)
+    [/%3ERL%3C/g, '%3EYB%3C'],
   ],
 };
 
