@@ -202,6 +202,131 @@ const UP_TYPES = [
   {value:"inhouse",   label:"In-House Content Report"},
 ];
 
+// ─── VISUAL HOOK MANAGER MODAL ───────────────────────────────────────────────
+
+function VHManagerModal({ options, onClose, onSave }: {
+  options: string[];
+  onClose: () => void;
+  onSave: (next: string[]) => void;
+}) {
+  const [items, setItems] = React.useState<string[]>(options);
+  const [editIdx, setEditIdx] = React.useState<number|null>(null);
+  const [editVal, setEditVal] = React.useState("");
+  const [newVal, setNewVal] = React.useState("");
+
+  const startEdit = (i: number) => { setEditIdx(i); setEditVal(items[i]); };
+  const commitEdit = (i: number) => {
+    const v = editVal.trim();
+    if (!v) return;
+    setItems(prev => prev.map((x,idx) => idx===i ? v : x));
+    setEditIdx(null);
+  };
+  const deleteItem = (i: number) => {
+    setItems(prev => prev.filter((_,idx) => idx!==i));
+    if (editIdx===i) setEditIdx(null);
+  };
+  const addNew = () => {
+    const v = newVal.trim();
+    if (!v || items.includes(v)) return;
+    setItems(prev => [...prev, v]);
+    setNewVal("");
+  };
+  const moveUp = (i: number) => {
+    if (i===0) return;
+    setItems(prev => { const a=[...prev]; [a[i-1],a[i]]=[a[i],a[i-1]]; return a; });
+  };
+  const moveDown = (i: number) => {
+    setItems(prev => { if (i>=prev.length-1) return prev; const a=[...prev]; [a[i],a[i+1]]=[a[i+1],a[i]]; return a; });
+  };
+
+  return (
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
+      style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+        {/* Header */}
+        <div style={{padding:"20px 24px 16px",borderBottom:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{fontWeight:800,fontSize:16,color:"#111",flex:1}}>🎬 Manage Visual Hook Options</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#9ca3af",padding:"0 4px",lineHeight:1}}>✕</button>
+        </div>
+
+        {/* List */}
+        <div style={{flex:1,overflowY:"auto",padding:"12px 24px"}}>
+          {items.length===0 && (
+            <div style={{textAlign:"center",padding:"32px 0",color:"#9ca3af",fontSize:13}}>No options yet — add one below.</div>
+          )}
+          {items.map((opt, i) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
+              {/* Up/down */}
+              <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                <button onClick={()=>moveUp(i)} disabled={i===0}
+                  style={{background:"none",border:"none",cursor:i===0?"not-allowed":"pointer",color:i===0?"#d1d5db":"#9ca3af",fontSize:10,padding:"1px 3px",lineHeight:1}}>▲</button>
+                <button onClick={()=>moveDown(i)} disabled={i===items.length-1}
+                  style={{background:"none",border:"none",cursor:i===items.length-1?"not-allowed":"pointer",color:i===items.length-1?"#d1d5db":"#9ca3af",fontSize:10,padding:"1px 3px",lineHeight:1}}>▼</button>
+              </div>
+              {/* Edit or display */}
+              {editIdx===i ? (
+                <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                  onKeyDown={e=>{ if(e.key==="Enter") commitEdit(i); if(e.key==="Escape") setEditIdx(null); }}
+                  style={{flex:1,padding:"5px 9px",border:"1px solid #7c3aed",borderRadius:6,fontFamily:"inherit",fontSize:13,outline:"none"}}/>
+              ) : (
+                <div style={{flex:1,fontSize:13,color:"#111",wordBreak:"break-word"}}>{opt}</div>
+              )}
+              {/* Actions */}
+              {editIdx===i ? (
+                <>
+                  <button onClick={()=>commitEdit(i)}
+                    style={{padding:"4px 10px",background:"#7c3aed",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>
+                    Save
+                  </button>
+                  <button onClick={()=>setEditIdx(null)}
+                    style={{padding:"4px 8px",background:"#f3f4f6",color:"#6b7280",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={()=>startEdit(i)}
+                    style={{padding:"4px 10px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
+                    ✏️ Edit
+                  </button>
+                  <button onClick={()=>deleteItem(i)}
+                    style={{padding:"4px 8px",background:"none",color:"#dc2626",border:"1px solid #fca5a5",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                    🗑
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Add new */}
+        <div style={{padding:"14px 24px",borderTop:"1px solid #e5e7eb",display:"flex",gap:8}}>
+          <input value={newVal} onChange={e=>setNewVal(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter") addNew(); }}
+            placeholder="Add new visual hook option…"
+            style={{flex:1,padding:"7px 12px",border:"1px solid #d1d5db",borderRadius:7,fontFamily:"inherit",fontSize:13,outline:"none"}}/>
+          <button onClick={addNew}
+            style={{padding:"7px 16px",background:"#7c3aed",color:"#fff",border:"none",borderRadius:7,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,whiteSpace:"nowrap"}}>
+            Add
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:"12px 24px",borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"flex-end",gap:10}}>
+          <button onClick={onClose}
+            style={{padding:"8px 18px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>
+            Cancel
+          </button>
+          <button onClick={()=>{ onSave(items); onClose(); }}
+            style={{padding:"8px 20px",background:"#111",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700}}>
+            💾 Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── VIDEO CARD ───────────────────────────────────────────────────────────────
 // Defined at module level so React never remounts it on parent re-renders.
 
@@ -541,6 +666,7 @@ export default function TikTokShopReporter() {
   } | null>(null);
   const [pubAtAgg, setPubAtAgg] = useState<typeof atAgg>(null);
   const [visualHookOptions, setVisualHookOptions] = useState<string[]>([]);
+  const [showVHManager, setShowVHManager] = useState(false);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -1647,6 +1773,12 @@ export default function TikTokShopReporter() {
             </button>
           )}
           {adminMode && (
+            <button onClick={()=>setShowVHManager(true)}
+              style={{background:"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              🎬 Manage Hooks
+            </button>
+          )}
+          {adminMode && (
             <button onClick={publishDashboard} disabled={publishing}
               style={{background:publishing?"#5b21b6":"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:publishing?"not-allowed":"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,opacity:publishing?0.8:1}}>
               {publishing?"⏳ Publishing…":"🚀 Update Dashboard"}
@@ -1966,6 +2098,22 @@ export default function TikTokShopReporter() {
           </div>
         </div>
       )}
+
+{showVHManager && (
+  <VHManagerModal
+    options={visualHookOptions}
+    onClose={()=>setShowVHManager(false)}
+    onSave={(next)=>{
+      setVisualHookOptions(next);
+      supabase.from('tiktok_hub_settings').upsert({
+        key: 'visual_hook_options',
+        value: JSON.stringify(next),
+        updated_at: new Date().toISOString(),
+      });
+    }}
+  />
+)}
+
     </div>
   );
 }
