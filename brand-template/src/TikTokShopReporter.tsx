@@ -455,7 +455,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
                     }}
                     style={{flex:1,padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,background:"#fff",color:"#111",outline:"none",cursor:"pointer"}}>
                     <option value="">— none —</option>
-                    {visualHookOptions.map(opt=>(
+                    {[...visualHookOptions].sort((a,b)=>a.localeCompare(b)).map(opt=>(
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                     <option value="__add_new__">+ Add new option…</option>
