@@ -2103,13 +2103,28 @@ export default function TikTokShopReporter() {
   <VHManagerModal
     options={visualHookOptions}
     onClose={()=>setShowVHManager(false)}
-    onSave={(next)=>{
+    onSave={async (next)=>{
       setVisualHookOptions(next);
       supabase.from('tiktok_hub_settings').upsert({
         key: 'visual_hook_options',
         value: JSON.stringify(next),
         updated_at: new Date().toISOString(),
       });
+      // Clear visualHook on any video whose current value isn't in the new list
+      const allowed = new Set(next);
+      const toClear = allTime.filter(r => r.visualHook && !allowed.has(r.visualHook));
+      if (toClear.length > 0) {
+        const clearOps = toClear.map(row => ({
+          report_id: row.videoId,
+          visual_hook: null,
+          updated_at: new Date().toISOString(),
+        }));
+        await supabase.from('tiktok_overrides').upsert(clearOps, { onConflict: 'report_id' });
+        // Update in-memory state
+        const clearIds = new Set(toClear.map(r => r.videoId));
+        const clearRow = (rs: VideoRow[]) => rs.map(r => clearIds.has(r.videoId) ? {...r, visualHook:""} : r);
+        setAllTime(clearRow); setLastMonth(clearRow); setInhouse(clearRow);
+      }
     }}
   />
 )}
