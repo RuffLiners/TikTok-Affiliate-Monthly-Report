@@ -90,11 +90,13 @@ interface VideoCardProps {
   editingId: string | null;
   adminMode: boolean;
   transcriptOpen: Set<string>;
+  visualHookOptions: string[];
   toggleHide: (videoId: string) => void;
   cancelEdit: () => void;
   openEdit: (r: VideoRow) => void;
   saveEdit: (r: VideoRow, draft: EditDraft) => void;
   toggleTranscript: (id: string) => void;
+  onAddVisualHookOption: (v: string) => void;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -204,7 +206,8 @@ const UP_TYPES = [
 // Defined at module level so React never remounts it on parent re-renders.
 
 function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptOpen,
-  toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript }: VideoCardProps) {
+  visualHookOptions, toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript,
+  onAddVisualHookOption }: VideoCardProps) {
   const sellPts  = pts(r.sellingPoints).map(lbl);
   const tags     = (r.hashtags||"").split(" ").filter(Boolean);
   const hidden   = hiddenIds.has(r.videoId);
@@ -213,6 +216,8 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
   const [draft, setDraft] = React.useState<EditDraft>({
     audioHook:"", visualHook:"", textHook:"", videoLength:"", cta:"", sellingPoints:"", keyIdea:""
   });
+  const [addingVisualHook, setAddingVisualHook] = React.useState(false);
+  const [newVisualHookText, setNewVisualHookText] = React.useState("");
   React.useEffect(() => {
     if (isEditing) {
       setDraft({
@@ -224,6 +229,8 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
         sellingPoints: pts(r.sellingPoints).join("\n"),
         keyIdea:      r.keyIdea      || "",
       });
+      setAddingVisualHook(false);
+      setNewVisualHookText("");
     }
   }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   const shortProduct = (r.product||"")
@@ -293,7 +300,6 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
             {(
               [
                 ["audioHook",   "🎵 Audio Hook",   "textarea"],
-                ["visualHook",  "🎬 Visual Hook",  "textarea"],
                 ["textHook",    "🎣 Text Hook",    "textarea"],
                 ["videoLength", "⏱ Video Length",  "input"  ],
                 ["cta",         "📣 Call to Action","input"  ],
@@ -311,6 +317,63 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
                 )}
               </div>
             ))}
+            {/* ── Visual Hook dropdown ── */}
+            <div>
+              <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>🎬 Visual Hook</div>
+              {!addingVisualHook ? (
+                <div style={{display:"flex",gap:6}}>
+                  <select
+                    value={draft.visualHook||""}
+                    onChange={e=>{
+                      if (e.target.value==="__add_new__") { setAddingVisualHook(true); }
+                      else { setDraft(d=>({...d,visualHook:e.target.value})); }
+                    }}
+                    style={{flex:1,padding:"6px 10px",border:"1px solid #d1d5db",borderRadius:6,fontFamily:"inherit",fontSize:12,background:"#fff",color:"#111",outline:"none",cursor:"pointer"}}>
+                    <option value="">— none —</option>
+                    {visualHookOptions.map(opt=>(
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    <option value="__add_new__">+ Add new option…</option>
+                  </select>
+                </div>
+              ) : (
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <input
+                    autoFocus
+                    value={newVisualHookText}
+                    onChange={e=>setNewVisualHookText(e.target.value)}
+                    placeholder="Type new visual hook…"
+                    onKeyDown={e=>{
+                      if (e.key==="Enter" && newVisualHookText.trim()) {
+                        const v=newVisualHookText.trim();
+                        onAddVisualHookOption(v);
+                        setDraft(d=>({...d,visualHook:v}));
+                        setNewVisualHookText(""); setAddingVisualHook(false);
+                      }
+                      if (e.key==="Escape") { setAddingVisualHook(false); setNewVisualHookText(""); }
+                    }}
+                    style={{flex:1,padding:"6px 10px",border:"1px solid #7c3aed",borderRadius:6,fontFamily:"inherit",fontSize:12,outline:"none",minWidth:0}}/>
+                  <button
+                    type="button"
+                    onClick={()=>{
+                      const v=newVisualHookText.trim();
+                      if (!v) return;
+                      onAddVisualHookOption(v);
+                      setDraft(d=>({...d,visualHook:v}));
+                      setNewVisualHookText(""); setAddingVisualHook(false);
+                    }}
+                    style={{padding:"6px 12px",background:"#7c3aed",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={()=>{ setAddingVisualHook(false); setNewVisualHookText(""); }}
+                    style={{padding:"6px 10px",background:"#f3f4f6",color:"#6b7280",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
             <div>
               <div style={{fontSize:10,color:"#6b7280",fontWeight:600,marginBottom:3}}>✅ Selling Points <span style={{fontWeight:400,color:"#9ca3af"}}>— one per line</span></div>
               <textarea value={draft.sellingPoints||""} onChange={e=>setDraft(d=>({...d,sellingPoints:e.target.value}))} rows={3}
@@ -477,6 +540,7 @@ export default function TikTokShopReporter() {
     sellingPoints: SellingPointSummary[];
   } | null>(null);
   const [pubAtAgg, setPubAtAgg] = useState<typeof atAgg>(null);
+  const [visualHookOptions, setVisualHookOptions] = useState<string[]>([]);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -615,6 +679,38 @@ export default function TikTokShopReporter() {
       const pat  = (pubAtRows || []).sort(srt).map(r => toRow(r, newMap));
       const plm  = (pubLmRows || []).sort(srt).map(r => toRow(r, newMap));
       const pinh = (pubInhRows|| []).sort(srt).map(r => toRow(r, newMap));
+
+      // ── Visual hook options: load from settings or seed from top 17 ──
+      const vhoSetting = settings?.find((s: {key:string,value:string}) => s.key === 'visual_hook_options');
+      if (vhoSetting) {
+        try { setVisualHookOptions(JSON.parse(vhoSetting.value)); } catch {}
+      } else if (adminFlag && at.length >= 1) {
+        // First time: seed options from top 17 videos' visual hooks (non-empty, deduplicated)
+        const seeded: string[] = [];
+        at.slice(0, 17).forEach(row => {
+          const v = (row.visualHook || "").trim();
+          if (v && !seeded.includes(v)) seeded.push(v);
+        });
+        setVisualHookOptions(seeded);
+        supabase.from('tiktok_hub_settings').upsert({
+          key: 'visual_hook_options',
+          value: JSON.stringify(seeded),
+          updated_at: new Date().toISOString(),
+        });
+        // Clear visual hooks for videos ranked 18+ (rank is 1-based from CSV, but
+        // array position after sort is 0-based — clear index 17 and beyond)
+        if (at.length > 17) {
+          const toClear = at.slice(17).filter(row => row.visualHook);
+          if (toClear.length > 0) {
+            const clearOps = toClear.map(row => ({
+              report_id: row.videoId,
+              visual_hook: null,
+              updated_at: new Date().toISOString(),
+            }));
+            supabase.from('tiktok_overrides').upsert(clearOps, { onConflict: 'report_id' });
+          }
+        }
+      }
 
       setAllTime(at); setLastMonth(lm); setInhouse(inh);
       setPubAllTime(pat); setPubLastMonth(plm); setPubInhouse(pinh);
@@ -1094,6 +1190,19 @@ export default function TikTokShopReporter() {
   const cancelEdit = () => setEditingId(null);
   const toggleTranscript = (id: string) => setTranscriptOpen(prev => { const s=new Set(prev); s.has(id)?s.delete(id):s.add(id); return s; });
 
+  const onAddVisualHookOption = (v: string) => {
+    setVisualHookOptions(prev => {
+      if (prev.includes(v)) return prev;
+      const next = [...prev, v];
+      supabase.from('tiktok_hub_settings').upsert({
+        key: 'visual_hook_options',
+        value: JSON.stringify(next),
+        updated_at: new Date().toISOString(),
+      });
+      return next;
+    });
+  };
+
   const importXLSX = (file: File) => {
     setUploading(true);
     setUploadStep("Reading XLSX file…");
@@ -1431,7 +1540,8 @@ export default function TikTokShopReporter() {
   const slicedLm = filteredLastMonth.slice(0, pageLm);
   const tabCount = {alltime:visAllTime.length, lastmonth:filteredLastMonth.length, inhouse:visInhouse.length, creators:filteredCreators.length, hooks:topVisualHooks.length+topTextHooks.length+topAudioHooks.length+topCTAs.length+topSellingPoints.length};
   const cardProps = { hiddenIds, editingId, adminMode, transcriptOpen,
-    toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript };
+    visualHookOptions, toggleHide, cancelEdit, openEdit, saveEdit, toggleTranscript,
+    onAddVisualHookOption };
   const gmvAt = visAllTime.reduce((s,r)=>s+r.revenue,0);
   const gmvLm = filteredLastMonth.reduce((s,r)=>s+r.revenue,0);
 
