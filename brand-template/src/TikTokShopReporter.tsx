@@ -225,6 +225,67 @@ const UP_TYPES = [
   {value:"inhouse",   label:"In-House Content Report"},
 ];
 
+const INSIGHT_TABS = [
+  {id:"efficiency",  label:"Video Efficiency",   icon:"📈", desc:"GMV per 1,000 views — which videos convert best regardless of size"},
+  {id:"products",    label:"Product Breakdown",   icon:"🛍", desc:"GMV, units, and top videos broken down by product"},
+  {id:"patterns",    label:"Posting Patterns",    icon:"📅", desc:"GMV distribution by day of week and month"},
+  {id:"playbook",    label:"Creator Playbook",    icon:"💡", desc:"Hook, CTA, and efficiency patterns for top creators"},
+  {id:"engagement",  label:"Engagement vs GMV",   icon:"⚡", desc:"Do likes and comments actually drive sales?"},
+  {id:"conversion",  label:"Conversion Rate",     icon:"🏆", desc:"Items sold per 1,000 views — purchase conversion leaders"},
+];
+const DEFAULT_TAB_VIS: Record<string,boolean> = {efficiency:false,products:false,patterns:false,playbook:false,engagement:false,conversion:false};
+
+// ─── PAGE MANAGER MODAL ──────────────────────────────────────────────────────
+
+function PageManagerModal({ visibility, onClose, onSave }: {
+  visibility: Record<string,boolean>;
+  onClose: () => void;
+  onSave: (next: Record<string,boolean>) => void;
+}) {
+  const [vis, setVis] = React.useState({...visibility});
+  const toggle = (id: string) => setVis(v => ({...v,[id]:!v[id]}));
+  const INSIGHT_TABS_LOCAL = [
+    {id:"efficiency",  label:"📈 Video Efficiency",   desc:"GMV per 1,000 views — which videos convert best"},
+    {id:"products",    label:"🛍 Product Breakdown",   desc:"GMV, units, and top videos by product"},
+    {id:"patterns",    label:"📅 Posting Patterns",    desc:"GMV by day of week and month"},
+    {id:"playbook",    label:"💡 Creator Playbook",    desc:"Hook, CTA, and efficiency patterns for top creators"},
+    {id:"engagement",  label:"⚡ Engagement vs GMV",   desc:"Do likes and comments actually drive sales?"},
+    {id:"conversion",  label:"🏆 Conversion Rate",     desc:"Items sold per 1,000 views — purchase conversion leaders"},
+  ];
+  return (
+    <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
+      style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"20px 24px 16px",borderBottom:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{fontWeight:800,fontSize:16,color:"#111",flex:1}}>📋 Manage Creator Pages</div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#9ca3af",padding:"0 4px"}}>✕</button>
+        </div>
+        <div style={{padding:"8px 24px 4px"}}>
+          <div style={{fontSize:12,color:"#6b7280",padding:"12px 0 8px"}}>Toggle pages on to include them in the creator dashboard. Changes go live when you click <strong>Update Dashboard</strong>.</div>
+        </div>
+        <div style={{padding:"0 24px 16px",display:"flex",flexDirection:"column",gap:10}}>
+          {INSIGHT_TABS_LOCAL.map(t => (
+            <div key={t.id} onClick={()=>toggle(t.id)}
+              style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",borderRadius:10,border:`1px solid ${vis[t.id]?"#bfdbfe":"#e5e7eb"}`,background:vis[t.id]?"#eff6ff":"#fafafa",cursor:"pointer",transition:"all .15s"}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:13,color:"#111",marginBottom:2}}>{t.label}</div>
+                <div style={{fontSize:11,color:"#6b7280"}}>{t.desc}</div>
+              </div>
+              <div style={{width:40,height:22,borderRadius:11,background:vis[t.id]?"#2563eb":"#d1d5db",position:"relative",flexShrink:0,transition:"background .15s"}}>
+                <div style={{position:"absolute",top:3,left:vis[t.id]?20:3,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .15s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 24px",borderTop:"1px solid #e5e7eb",display:"flex",justifyContent:"flex-end",gap:10}}>
+          <button onClick={onClose} style={{padding:"8px 18px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>Cancel</button>
+          <button onClick={()=>{onSave(vis);onClose();}} style={{padding:"8px 20px",background:"#111",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700}}>💾 Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── VISUAL HOOK MANAGER MODAL ───────────────────────────────────────────────
 
 function VHManagerModal({ options, onClose, onSave }: {
@@ -696,6 +757,9 @@ export default function TikTokShopReporter() {
   const [pubAtAgg, setPubAtAgg] = useState<typeof atAgg>(null);
   const [visualHookOptions, setVisualHookOptions] = useState<string[]>([]);
   const [showVHManager, setShowVHManager] = useState(false);
+  const [tabVisibility, setTabVisibility] = useState<Record<string,boolean>>({...DEFAULT_TAB_VIS});
+  const [pubTabVisibility, setPubTabVisibility] = useState<Record<string,boolean>>({...DEFAULT_TAB_VIS});
+  const [showPageManager, setShowPageManager] = useState(false);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -822,6 +886,11 @@ export default function TikTokShopReporter() {
           } catch {}
         }
       });
+
+      const tvSetting = settings?.find((s: {key:string,value:string}) => s.key === 'tab_visibility');
+      if (tvSetting) { try { setTabVisibility({...DEFAULT_TAB_VIS,...JSON.parse(tvSetting.value)}); } catch {} }
+      const ptvSetting = settings?.find((s: {key:string,value:string}) => s.key === 'pub_tab_visibility');
+      if (ptvSetting) { try { setPubTabVisibility({...DEFAULT_TAB_VIS,...JSON.parse(ptvSetting.value)}); } catch {} }
 
       const atAggSetting = settings?.find((s: {key:string,value:string}) => s.key === 'at_agg');
       if (atAggSetting) { try { setAtAgg(JSON.parse(atAggSetting.value)); } catch {} }
@@ -1067,6 +1136,97 @@ export default function TikTokShopReporter() {
   const topAudioHooks    = useMemo(() => buildTopAudioHooks(src),           [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topCTAs          = useMemo(() => buildTopHooks(src, 'cta'),         [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Insight page data ────────────────────────────────────────────────────────
+
+  const MIN_VIEWS = 5000;
+
+  const efficiencyData = useMemo(() =>
+    src.filter(r => r.views >= MIN_VIEWS)
+       .map(r => ({...r, effPer1k: (r.revenue / r.views) * 1000}))
+       .sort((a,b) => b.effPer1k - a.effPer1k),
+  [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const productData = useMemo(() => {
+    const map: Record<string,{product:string;gmv:number;units:number;count:number;creators:Set<string>;videos:VideoRow[]}> = {};
+    src.forEach(r => {
+      const p = (r.product||"Unknown").trim();
+      if (!map[p]) map[p] = {product:p,gmv:0,units:0,count:0,creators:new Set(),videos:[]};
+      map[p].gmv += r.revenue; map[p].units += r.itemsSold; map[p].count++;
+      map[p].creators.add(r.creator);
+      if (map[p].videos.length < 5) map[p].videos.push(r);
+    });
+    return Object.values(map)
+      .map(p => ({...p, creatorCount:p.creators.size, avgGmv: p.gmv/p.count, creators: undefined}))
+      .sort((a,b) => b.gmv - a.gmv);
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const patternsData = useMemo(() => {
+    const parseDate = (s: string) => {
+      if (!s) return null;
+      const d = new Date(s.includes('/') ? s.replace(/(\d+)\/(\d+)\/(\d+)/,'$3-$1-$2') : s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const byDay: {label:string;gmv:number;count:number}[] = DAYS.map(d => ({label:d,gmv:0,count:0}));
+    const byMonth: {label:string;gmv:number;count:number}[] = MONTHS.map(m => ({label:m,gmv:0,count:0}));
+    src.forEach(r => {
+      const d = parseDate(r.datePosted||'');
+      if (!d) return;
+      byDay[d.getDay()].gmv += r.revenue; byDay[d.getDay()].count++;
+      byMonth[d.getMonth()].gmv += r.revenue; byMonth[d.getMonth()].count++;
+    });
+    return {byDay, byMonth};
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const playbookData = useMemo(() => {
+    const map: Record<string,{creator:string;gmv:number;views:number;count:number;lengths:number[];hooks:Record<string,number>;ctas:Record<string,number>;products:Record<string,number>}> = {};
+    src.forEach(r => {
+      const k = r.creator.toLowerCase().trim();
+      if (!map[k]) map[k] = {creator:r.creator,gmv:0,views:0,count:0,lengths:[],hooks:{},ctas:{},products:{}};
+      const e = map[k];
+      e.gmv += r.revenue; e.views += r.views; e.count++;
+      const ls = parseLengthSecs(r.videoLength||''); if (ls) e.lengths.push(ls);
+      if (r.visualHook) e.hooks[r.visualHook] = (e.hooks[r.visualHook]||0)+1;
+      if (r.cta) e.ctas[r.cta] = (e.ctas[r.cta]||0)+1;
+      if (r.product) e.products[r.product] = (e.products[r.product]||0)+1;
+    });
+    const topKey = (obj: Record<string,number>) => Object.entries(obj).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+    return Object.values(map)
+      .filter(c => c.count >= 2)
+      .map(c => ({
+        creator: c.creator, gmv: c.gmv, count: c.count,
+        avgGmv: c.gmv/c.count,
+        convRate: c.views > 0 ? (c.gmv/c.views)*1000 : 0,
+        avgLengthSecs: c.lengths.length ? Math.round(c.lengths.reduce((a,b)=>a+b,0)/c.lengths.length) : 0,
+        topHook: topKey(c.hooks), topCta: topKey(c.ctas), topProduct: topKey(c.products),
+      }))
+      .sort((a,b) => b.gmv - a.gmv)
+      .slice(0, 15);
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const engagementData = useMemo(() => {
+    const likeBuckets = [
+      {label:'0',min:0,max:0},{label:'1–99',min:1,max:99},{label:'100–999',min:100,max:999},
+      {label:'1K–9.9K',min:1000,max:9999},{label:'10K–99K',min:10000,max:99999},{label:'100K+',min:100000,max:Infinity}
+    ].map(b => ({...b,gmv:0,count:0,units:0}));
+    src.forEach(r => {
+      const b = likeBuckets.find(b => r.likes >= b.min && r.likes <= b.max);
+      if (b) { b.gmv += r.revenue; b.count++; b.units += r.itemsSold; }
+    });
+    const noGmv = src.filter(r => r.revenue === 0);
+    const withGmv = src.filter(r => r.revenue > 0);
+    return {likeBuckets: likeBuckets.filter(b=>b.count>0), noGmv: noGmv.length, withGmv: withGmv.length,
+      avgLikesWithGmv: withGmv.length ? Math.round(withGmv.reduce((s,r)=>s+r.likes,0)/withGmv.length) : 0,
+      avgLikesNoGmv:   noGmv.length   ? Math.round(noGmv.reduce((s,r)=>s+r.likes,0)/noGmv.length)   : 0};
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const conversionData = useMemo(() =>
+    src.filter(r => r.views >= MIN_VIEWS)
+       .map(r => ({...r, convPer1k: (r.itemsSold / r.views) * 1000}))
+       .sort((a,b) => b.convPer1k - a.convPer1k),
+  [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // GMV distribution by video length in 10-second buckets
   const lengthDist = useMemo(() => {
@@ -1966,6 +2126,12 @@ export default function TikTokShopReporter() {
             <button onClick={()=>setShowVHManager(true)}
               style={{background:"#7c3aed",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
               🎬 Manage Hooks
+            </button>
+          )}
+          {adminMode && (
+            <button onClick={()=>setShowPageManager(true)}
+              style={{background:"#0f172a",color:"#fff",border:"none",padding:"8px 16px",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>
+              📋 Manage Pages
             </button>
           )}
           {adminMode && (
