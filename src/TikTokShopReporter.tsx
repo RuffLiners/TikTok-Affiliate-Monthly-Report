@@ -1652,58 +1652,95 @@ export default function TikTokShopReporter() {
     const [hovered, setHovered] = React.useState<number|null>(null);
     if (lengthDist.length === 0) return null;
     const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
-    const BAR_MAX = 220;
-    const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60 ? `${s%60}s` : ""}`;
+    const CHART_H = 200;
+    const Y_TICKS = 5;
+    const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60?`${s%60}s`:""}`;
     const totalVideos = lengthDist.reduce((s,b)=>s+b.count,0);
+
+    // Nice round Y-axis ticks
+    const rawStep = maxGmv / Y_TICKS;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const niceStep = Math.ceil(rawStep / magnitude) * magnitude;
+    const yMax = niceStep * Y_TICKS;
+    const ticks = Array.from({length: Y_TICKS + 1}, (_, i) => i * niceStep);
+    const fmtY = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(v%1000===0?0:1)}K` : `$${v}`;
+
     return (
-      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"24px 24px 20px",marginTop:24}}>
-        <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
-        <div style={{fontSize:12,color:"#9ca3af",marginBottom:24}}>
-          Total revenue in 10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 20px 16px",marginTop:24,maxWidth:680}}>
+        <div style={{fontWeight:800,fontSize:15,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
+        <div style={{fontSize:11,color:"#9ca3af",marginBottom:16}}>
+          10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
         </div>
-        <div style={{overflowX:"auto"}}>
-          <div style={{display:"flex",alignItems:"flex-end",gap:8,minWidth:"fit-content",paddingBottom:8}}>
-            {lengthDist.map((b, i) => {
-              const pct = maxGmv > 0 ? b.gmv / maxGmv : 0;
-              const barH = Math.round(pct * BAR_MAX);
-              const isHov = hovered === i;
-              const hasData = b.gmv > 0;
-              return (
-                <div key={b.start}
-                  style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,width:64}}
-                  onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
 
-                  {/* GMV — shown on hover or for the tallest bar */}
-                  <div style={{fontSize:11,fontWeight:700,color:"#16a34a",whiteSpace:"nowrap",height:16,lineHeight:"16px",marginBottom:4,opacity:(isHov||pct===1)&&hasData?1:0,transition:"opacity .12s"}}>
-                    {f$(b.gmv)}
-                  </div>
+        <div style={{display:"flex",gap:0}}>
+          {/* Y-axis */}
+          <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",alignItems:"flex-end",paddingBottom:36,paddingRight:8,flexShrink:0,height:CHART_H+36}}>
+            {[...ticks].reverse().map(t=>(
+              <div key={t} style={{fontSize:10,color:"#9ca3af",whiteSpace:"nowrap",lineHeight:"1"}}>{fmtY(t)}</div>
+            ))}
+          </div>
 
-                  {/* Video count */}
-                  <div style={{fontSize:11,color:"#6b7280",fontWeight:600,height:15,lineHeight:"15px",marginBottom:4}}>
-                    {b.count>0?`${b.count}v`:""}
-                  </div>
+          {/* Chart body */}
+          <div style={{flex:1,overflowX:"auto",minWidth:0}}>
+            <div style={{position:"relative",height:CHART_H,minWidth:"fit-content"}}>
+              {/* Horizontal gridlines */}
+              {ticks.map((t,i)=>(
+                <div key={t} style={{
+                  position:"absolute",left:0,right:0,
+                  bottom: `${(t/yMax)*100}%`,
+                  borderTop: i===0 ? "2px solid #d1d5db" : "1px dashed #e5e7eb",
+                  zIndex:0,
+                }}/>
+              ))}
 
-                  {/* Bar */}
-                  <div style={{
-                    width:52,
-                    height: hasData ? Math.max(barH, 6) : 3,
-                    background: !hasData?"#f3f4f6": isHov?"#15803d":"#16a34a",
-                    borderRadius:"6px 6px 0 0",
-                    alignSelf:"flex-end",
-                    transition:"background .12s",
-                  }}/>
+              {/* Bars */}
+              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:"100%",position:"relative",zIndex:1,paddingTop:4}}>
+                {lengthDist.map((b, i) => {
+                  const pct = yMax > 0 ? b.gmv / yMax : 0;
+                  const barH = Math.round(pct * CHART_H);
+                  const isHov = hovered === i;
+                  const hasData = b.gmv > 0;
+                  return (
+                    <div key={b.start}
+                      style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",flexShrink:0,width:52,height:"100%",cursor:"default"}}
+                      onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
+                      {/* Hover GMV tooltip */}
+                      {isHov && hasData && (
+                        <div style={{position:"absolute",bottom:barH+6,background:"#111",color:"#fff",fontSize:10,fontWeight:700,borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",pointerEvents:"none",zIndex:10}}>
+                          {f$(b.gmv)} · {b.count}v
+                        </div>
+                      )}
+                      <div style={{
+                        width:44,
+                        height: hasData ? Math.max(barH, 4) : 0,
+                        background: !hasData?"#f3f4f6": isHov?"#15803d":"#16a34a",
+                        borderRadius:"5px 5px 0 0",
+                        transition:"background .12s",
+                        alignSelf:"flex-end",
+                        position:"relative",
+                      }}>
+                        {/* Count label above bar */}
+                        {b.count>0 && (
+                          <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",fontSize:10,color:"#6b7280",fontWeight:600,whiteSpace:"nowrap"}}>
+                            {b.count}v
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-                  {/* Baseline */}
-                  <div style={{width:52,height:2,background:"#e5e7eb",marginBottom:8}}/>
-
-                  {/* Time label */}
-                  <div style={{fontSize:12,color:isHov?"#111":"#6b7280",fontWeight:isHov?700:500,textAlign:"center"}}>
-                    {fmt(b.start)}
-                  </div>
-                  <div style={{fontSize:10,color:"#d1d5db",textAlign:"center"}}>–{fmt(b.end)}</div>
+            {/* X-axis labels */}
+            <div style={{display:"flex",gap:6,paddingTop:6,minWidth:"fit-content"}}>
+              {lengthDist.map(b=>(
+                <div key={b.start} style={{width:52,flexShrink:0,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"#374151",fontWeight:500}}>{fmt(b.start)}</div>
+                  <div style={{fontSize:9,color:"#d1d5db"}}>–{fmt(b.end)}</div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
       </div>
