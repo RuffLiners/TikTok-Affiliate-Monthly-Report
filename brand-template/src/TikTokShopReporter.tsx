@@ -1652,44 +1652,68 @@ export default function TikTokShopReporter() {
     const [hovered, setHovered] = React.useState<number|null>(null);
     if (lengthDist.length === 0) return null;
     const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
-    const fmtRange = (b: typeof lengthDist[0]) => {
-      const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60?`${s%60}s`:""}`;
-      return `${fmt(b.start)}–${fmt(b.end)}`;
-    };
+    const BAR_H = 180;
+    const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60 ? `${s%60}s` : ""}`;
+    const totalVideos = lengthDist.reduce((s,b)=>s+b.count,0);
     return (
-      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px",marginBottom:28}}>
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"24px 24px 20px",marginBottom:28}}>
         <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
-        <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Total revenue by video length in 10-second intervals (videos with length filled in)</div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:160,overflowX:"auto",paddingBottom:4}}>
-          {lengthDist.map((b, i) => {
-            const pct = maxGmv > 0 ? b.gmv / maxGmv : 0;
-            const barH = Math.max(pct * 140, b.gmv > 0 ? 4 : 0);
-            const isHov = hovered === i;
-            return (
-              <div key={b.start} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0,minWidth:44}}
-                onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
-                {/* Tooltip */}
-                <div style={{fontSize:10,fontWeight:700,color:"#16a34a",whiteSpace:"nowrap",visibility:isHov&&b.gmv>0?"visible":"hidden",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:6,padding:"3px 7px"}}>
-                  {f$(b.gmv)}
-                </div>
-                {/* Bar */}
-                <div style={{width:36,height:barH,background:b.gmv>0?(isHov?"#15803d":"#16a34a"):"#f3f4f6",borderRadius:"4px 4px 0 0",transition:"background .15s",flexShrink:0,alignSelf:"flex-end",position:"relative"}}>
-                  {b.count>0 && (
-                    <div style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:9,color:"#6b7280",whiteSpace:"nowrap"}}>
-                      {b.count}v
-                    </div>
-                  )}
-                </div>
-                {/* Label */}
-                <div style={{fontSize:9,color:"#9ca3af",textAlign:"center",whiteSpace:"nowrap",transform:"rotate(-35deg)",transformOrigin:"top center",marginTop:2,lineHeight:1}}>
-                  {fmtRange(b)}
-                </div>
-              </div>
-            );
-          })}
+        <div style={{fontSize:12,color:"#9ca3af",marginBottom:24}}>
+          Total revenue by video length in 10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
         </div>
-        <div style={{marginTop:28,fontSize:11,color:"#9ca3af",textAlign:"center"}}>
-          {lengthDist.filter(b=>b.count>0).length} intervals · {lengthDist.reduce((s,b)=>s+b.count,0)} videos with length data
+
+        {/* Chart area */}
+        <div style={{overflowX:"auto",overflowY:"visible"}}>
+          <div style={{display:"flex",alignItems:"flex-end",gap:8,minWidth:"fit-content",paddingBottom:8}}>
+            {lengthDist.map((b, i) => {
+              const pct = maxGmv > 0 ? b.gmv / maxGmv : 0;
+              const barH = Math.round(pct * BAR_H);
+              const isHov = hovered === i;
+              const hasData = b.gmv > 0;
+              return (
+                <div key={b.start}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,width:56,cursor:hasData?"default":"default"}}
+                  onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
+
+                  {/* GMV label above bar — always visible for top bar, hover for others */}
+                  <div style={{
+                    fontSize:10,fontWeight:700,color:"#16a34a",whiteSpace:"nowrap",
+                    marginBottom:4,height:14,lineHeight:"14px",
+                    opacity: hasData && (isHov || pct===1) ? 1 : isHov ? 1 : 0,
+                    transition:"opacity .15s",
+                  }}>
+                    {f$(b.gmv)}
+                  </div>
+
+                  {/* Video count */}
+                  <div style={{fontSize:10,color:"#6b7280",marginBottom:3,height:13,lineHeight:"13px",fontWeight:600}}>
+                    {b.count > 0 ? `${b.count}v` : ""}
+                  </div>
+
+                  {/* Bar */}
+                  <div style={{
+                    width:48,
+                    height: hasData ? Math.max(barH, 6) : 3,
+                    background: !hasData ? "#f3f4f6" : isHov ? "#15803d" : "#16a34a",
+                    borderRadius:"5px 5px 0 0",
+                    transition:"background .15s, height .2s",
+                    alignSelf:"flex-end",
+                  }}/>
+
+                  {/* Baseline tick */}
+                  <div style={{width:48,height:2,background:"#e5e7eb"}}/>
+
+                  {/* Label: start time of bucket */}
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:6,fontWeight:500,textAlign:"center"}}>
+                    {fmt(b.start)}
+                  </div>
+                  <div style={{fontSize:9,color:"#d1d5db",textAlign:"center",lineHeight:1}}>
+                    –{fmt(b.end)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
