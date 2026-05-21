@@ -1652,39 +1652,55 @@ export default function TikTokShopReporter() {
     const [hovered, setHovered] = React.useState<number|null>(null);
     if (lengthDist.length === 0) return null;
     const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
+    const BAR_MAX = 220;
     const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60 ? `${s%60}s` : ""}`;
     const totalVideos = lengthDist.reduce((s,b)=>s+b.count,0);
-    const hov = hovered !== null ? lengthDist[hovered] : null;
     return (
-      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"16px 20px",marginTop:20}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:12,marginBottom:12,flexWrap:"wrap"}}>
-          <span style={{fontWeight:800,fontSize:14,color:"#111"}}>📊 GMV by Video Length</span>
-          <span style={{fontSize:11,color:"#9ca3af"}}>{totalVideos} video{totalVideos!==1?"s":""} · 10-second intervals</span>
-          {hov && hov.gmv>0 && (
-            <span style={{marginLeft:"auto",fontSize:12,fontWeight:700,color:"#16a34a"}}>
-              {fmt(hov.start)}–{fmt(hov.end)}: {f$(hov.gmv)} · {hov.count}v
-            </span>
-          )}
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"24px 24px 20px",marginTop:24}}>
+        <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
+        <div style={{fontSize:12,color:"#9ca3af",marginBottom:24}}>
+          Total revenue in 10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
         </div>
         <div style={{overflowX:"auto"}}>
-          <div style={{display:"flex",alignItems:"flex-end",gap:4,minWidth:"fit-content",height:80,paddingBottom:0}}>
+          <div style={{display:"flex",alignItems:"flex-end",gap:8,minWidth:"fit-content",paddingBottom:8}}>
             {lengthDist.map((b, i) => {
               const pct = maxGmv > 0 ? b.gmv / maxGmv : 0;
-              const barH = Math.round(pct * 72);
+              const barH = Math.round(pct * BAR_MAX);
               const isHov = hovered === i;
               const hasData = b.gmv > 0;
               return (
-                <div key={b.start} style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,width:40}}
+                <div key={b.start}
+                  style={{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,width:64}}
                   onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
+
+                  {/* GMV — shown on hover or for the tallest bar */}
+                  <div style={{fontSize:11,fontWeight:700,color:"#16a34a",whiteSpace:"nowrap",height:16,lineHeight:"16px",marginBottom:4,opacity:(isHov||pct===1)&&hasData?1:0,transition:"opacity .12s"}}>
+                    {f$(b.gmv)}
+                  </div>
+
+                  {/* Video count */}
+                  <div style={{fontSize:11,color:"#6b7280",fontWeight:600,height:15,lineHeight:"15px",marginBottom:4}}>
+                    {b.count>0?`${b.count}v`:""}
+                  </div>
+
+                  {/* Bar */}
                   <div style={{
-                    width:32,height: hasData ? Math.max(barH,4) : 2,
+                    width:52,
+                    height: hasData ? Math.max(barH, 6) : 3,
                     background: !hasData?"#f3f4f6": isHov?"#15803d":"#16a34a",
-                    borderRadius:"3px 3px 0 0",alignSelf:"flex-end",transition:"background .12s",
+                    borderRadius:"6px 6px 0 0",
+                    alignSelf:"flex-end",
+                    transition:"background .12s",
                   }}/>
-                  <div style={{width:32,height:2,background:"#e5e7eb",marginBottom:4}}/>
-                  <div style={{fontSize:9,color:isHov?"#111":"#9ca3af",fontWeight:isHov?700:400,textAlign:"center",lineHeight:1.2}}>
+
+                  {/* Baseline */}
+                  <div style={{width:52,height:2,background:"#e5e7eb",marginBottom:8}}/>
+
+                  {/* Time label */}
+                  <div style={{fontSize:12,color:isHov?"#111":"#6b7280",fontWeight:isHov?700:500,textAlign:"center"}}>
                     {fmt(b.start)}
                   </div>
+                  <div style={{fontSize:10,color:"#d1d5db",textAlign:"center"}}>–{fmt(b.end)}</div>
                 </div>
               );
             })}
