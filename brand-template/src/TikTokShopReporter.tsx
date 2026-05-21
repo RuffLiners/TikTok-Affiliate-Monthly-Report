@@ -1070,14 +1070,8 @@ export default function TikTokShopReporter() {
 
   // GMV distribution by video length in 10-second buckets
   const lengthDist = useMemo(() => {
-    // Combine all three datasets, deduplicated by videoId so GMV isn't double-counted
-    const seen = new Set<string>();
-    const all: VideoRow[] = [];
-    const addRows = (rows: VideoRow[]) => rows.forEach(r => { if (!seen.has(r.videoId)) { seen.add(r.videoId); all.push(r); } });
-    if (adminMode) { addRows(allTime); addRows(lastMonth); addRows(inhouse); }
-    else           { addRows(pubAllTime); addRows(pubLastMonth); addRows(pubInhouse); }
     const buckets: Record<number, {gmv: number; count: number}> = {};
-    all.forEach(r => {
+    src.forEach(r => {
       const secs = parseLengthSecs(r.videoLength || "");
       if (secs === null || secs <= 0) return;
       const bucket = Math.floor(secs / 10) * 10;
@@ -1092,7 +1086,7 @@ export default function TikTokShopReporter() {
       result.push({ start: b, end: b+10, gmv: buckets[b]?.gmv||0, count: buckets[b]?.count||0 });
     }
     return result;
-  }, [allTime, lastMonth, inhouse, pubAllTime, pubLastMonth, pubInhouse, adminMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── filter helpers ───────────────────────────────────────────────────────────
 
