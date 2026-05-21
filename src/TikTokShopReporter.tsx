@@ -1666,7 +1666,7 @@ export default function TikTokShopReporter() {
     const fmtY = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(v%1000===0?0:1)}K` : `$${v}`;
 
     return (
-      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 20px 16px",marginTop:24,maxWidth:680}}>
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 20px 16px",marginBottom:24}}>
         <div style={{fontWeight:800,fontSize:15,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
         <div style={{fontSize:11,color:"#9ca3af",marginBottom:16}}>
           10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
@@ -2172,9 +2172,10 @@ export default function TikTokShopReporter() {
                   <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
                 </div>
 
-                {/* ── Right col: CTAs + Selling Points ── */}
+                {/* ── Right col: Chart + CTAs + Selling Points ── */}
                 <div>
-                  <div style={{marginBottom:8}}>
+                  <LengthDistChart />
+                  <div style={{marginBottom:8,marginTop:24}}>
                     <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
                     <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
                   </div>
@@ -2197,7 +2198,6 @@ export default function TikTokShopReporter() {
                   )}
                 </div>
               </div>
-              <LengthDistChart />
             </>
         )}
       </div>
