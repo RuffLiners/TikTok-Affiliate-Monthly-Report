@@ -518,6 +518,12 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
               <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{v}</div>
             </div>
           ))}
+          {r.videoLength && (
+            <div>
+              <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>⏱ Length</div>
+              <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{r.videoLength}</div>
+            </div>
+          )}
         </div>
 
         {r.product && (
@@ -537,7 +543,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
           </div>
         )}
 
-        {(hookRows.length>0 || r.videoLength) && (
+        {hookRows.length>0 && (
           <div>
             <div style={{fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>Hooks</div>
             <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -548,13 +554,6 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
                   <span style={{color:"#111",lineHeight:1.45}}>{val}</span>
                 </div>
               ))}
-              {r.videoLength && (
-                <div style={{display:"flex",gap:7,alignItems:"flex-start",fontSize:12}}>
-                  <span style={{flexShrink:0,width:14,textAlign:"center"}}>⏱</span>
-                  <span style={{color:"#6b7280",flexShrink:0,fontWeight:600}}>Video Length:</span>
-                  <span style={{color:"#111"}}>{r.videoLength}</span>
-                </div>
-              )}
             </div>
           </div>
         )}
