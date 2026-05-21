@@ -109,6 +109,29 @@ const f$  = (v: number): string => "$"+Number(v||0).toLocaleString("en-US",{mini
 const fN  = (v: number): string => Number(v||0).toLocaleString("en-US");
 const fK  = (v: number): string => { const n=Number(v||0); return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(Math.round(n)); };
 
+// Parse a human-typed video length string into total seconds. Returns null if unparseable.
+const parseLengthSecs = (s: string): number | null => {
+  if (!s) return null;
+  s = s.trim();
+  // mm:ss or h:mm:ss
+  const colonMatch = s.match(/^(?:(\d+):)?(\d+):(\d+)$/);
+  if (colonMatch) {
+    const h = parseInt(colonMatch[1]||"0");
+    const m = parseInt(colonMatch[2]);
+    const sec = parseInt(colonMatch[3]);
+    return h*3600 + m*60 + sec;
+  }
+  // "1m30s", "1m 30s", "90s", "90"
+  const minsMatch = s.match(/(?:(\d+)\s*m(?:in)?s?)?\s*(?:(\d+)\s*s(?:ec)?s?)?/i);
+  if (minsMatch && (minsMatch[1] || minsMatch[2])) {
+    return (parseInt(minsMatch[1]||"0"))*60 + parseInt(minsMatch[2]||"0");
+  }
+  // bare number — treat as seconds
+  const bare = parseFloat(s);
+  if (!isNaN(bare) && bare > 0) return Math.round(bare);
+  return null;
+};
+
 // ─── CSV PARSER ───────────────────────────────────────────────────────────────
 
 // parseCSV always stores raw CSV values — overrides are applied separately so
@@ -1045,6 +1068,26 @@ export default function TikTokShopReporter() {
   const topCTAs          = useMemo(() => buildTopHooks(src, 'cta'),         [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // GMV distribution by video length in 10-second buckets
+  const lengthDist = useMemo(() => {
+    const buckets: Record<number, {gmv: number; count: number}> = {};
+    src.forEach(r => {
+      const secs = parseLengthSecs(r.videoLength || "");
+      if (secs === null || secs <= 0) return;
+      const bucket = Math.floor(secs / 10) * 10;
+      if (!buckets[bucket]) buckets[bucket] = {gmv:0, count:0};
+      buckets[bucket].gmv += r.revenue;
+      buckets[bucket].count += 1;
+    });
+    if (!Object.keys(buckets).length) return [];
+    const max = Math.max(...Object.keys(buckets).map(Number));
+    const result = [];
+    for (let b = 0; b <= max; b += 10) {
+      result.push({ start: b, end: b+10, gmv: buckets[b]?.gmv||0, count: buckets[b]?.count||0 });
+    }
+    return result;
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── filter helpers ───────────────────────────────────────────────────────────
 
   const persistSetting = async (key: string, n: number) => {
@@ -1604,6 +1647,54 @@ export default function TikTokShopReporter() {
     );
   };
 
+  // GMV by video length distribution chart
+  const LengthDistChart = () => {
+    const [hovered, setHovered] = React.useState<number|null>(null);
+    if (lengthDist.length === 0) return null;
+    const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
+    const fmtRange = (b: typeof lengthDist[0]) => {
+      const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60?`${s%60}s`:""}`;
+      return `${fmt(b.start)}–${fmt(b.end)}`;
+    };
+    return (
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px",marginBottom:28}}>
+        <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
+        <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Total revenue by video length in 10-second intervals (videos with length filled in)</div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:6,height:160,overflowX:"auto",paddingBottom:4}}>
+          {lengthDist.map((b, i) => {
+            const pct = maxGmv > 0 ? b.gmv / maxGmv : 0;
+            const barH = Math.max(pct * 140, b.gmv > 0 ? 4 : 0);
+            const isHov = hovered === i;
+            return (
+              <div key={b.start} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0,minWidth:44}}
+                onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
+                {/* Tooltip */}
+                <div style={{fontSize:10,fontWeight:700,color:"#16a34a",whiteSpace:"nowrap",visibility:isHov&&b.gmv>0?"visible":"hidden",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:6,padding:"3px 7px"}}>
+                  {f$(b.gmv)}
+                </div>
+                {/* Bar */}
+                <div style={{width:36,height:barH,background:b.gmv>0?(isHov?"#15803d":"#16a34a"):"#f3f4f6",borderRadius:"4px 4px 0 0",transition:"background .15s",flexShrink:0,alignSelf:"flex-end",position:"relative"}}>
+                  {b.count>0 && (
+                    <div style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:9,color:"#6b7280",whiteSpace:"nowrap"}}>
+                      {b.count}v
+                    </div>
+                  )}
+                </div>
+                {/* Label */}
+                <div style={{fontSize:9,color:"#9ca3af",textAlign:"center",whiteSpace:"nowrap",transform:"rotate(-35deg)",transformOrigin:"top center",marginTop:2,lineHeight:1}}>
+                  {fmtRange(b)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{marginTop:28,fontSize:11,color:"#9ca3af",textAlign:"center"}}>
+          {lengthDist.filter(b=>b.count>0).length} intervals · {lengthDist.reduce((s,b)=>s+b.count,0)} videos with length data
+        </div>
+      </div>
+    );
+  };
+
   // Hook section: accent header + stacked hook entries
   const HookSection = ({hooks, icon, title, accent}: {hooks: HookSummary[]; icon: string; title: string; accent: string}) => {
     if (hooks.length === 0) return null;
@@ -2016,7 +2107,9 @@ export default function TikTokShopReporter() {
         {tab==="hooks" && (
           topVisualHooks.length===0 && topTextHooks.length===0 && topAudioHooks.length===0 && topCTAs.length===0 && topSellingPoints.length===0
             ? <Empty msg='Upload the All-Time report first — Hooks, CTAs, and Selling Points are computed from that data'/>
-            : <div className="rl-hooks-grid">
+            : <>
+              <LengthDistChart />
+              <div className="rl-hooks-grid">
                 {/* ── Left col: Hooks ── */}
                 <div>
                   <div style={{marginBottom:8}}>
@@ -2053,6 +2146,7 @@ export default function TikTokShopReporter() {
                   )}
                 </div>
               </div>
+            </>
         )}
       </div>
 
