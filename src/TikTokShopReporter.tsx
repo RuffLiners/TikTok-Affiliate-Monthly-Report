@@ -1652,10 +1652,14 @@ export default function TikTokShopReporter() {
     const [hovered, setHovered] = React.useState<number|null>(null);
     if (lengthDist.length === 0) return null;
     const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
-    const CHART_H = 200;
+    const CHART_H = 220;
     const Y_TICKS = 5;
     const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60?`${s%60}s`:""}`;
     const totalVideos = lengthDist.reduce((s,b)=>s+b.count,0);
+    const totalGmv = lengthDist.reduce((s,b)=>s+b.gmv,0);
+    const activeBuckets = lengthDist.filter(b=>b.count>0);
+    const bestBucket = activeBuckets.reduce((best,b)=>b.gmv>best.gmv?b:best, activeBuckets[0]);
+    const bestAvgBucket = activeBuckets.reduce((best,b)=>(b.gmv/b.count)>(best.gmv/best.count)?b:best, activeBuckets[0]);
 
     // Nice round Y-axis ticks
     const rawStep = maxGmv / Y_TICKS;
@@ -1663,16 +1667,51 @@ export default function TikTokShopReporter() {
     const niceStep = Math.ceil(rawStep / magnitude) * magnitude;
     const yMax = niceStep * Y_TICKS;
     const ticks = Array.from({length: Y_TICKS + 1}, (_, i) => i * niceStep);
-    const fmtY = (v: number) => v >= 1000 ? `$${(v/1000).toFixed(v%1000===0?0:1)}K` : `$${v}`;
+    const fmtY = (v: number) => v >= 1000 ? `$${Math.round(v/1000)}K` : `$${v}`;
+
+    const hovB = hovered !== null ? lengthDist[hovered] : null;
 
     return (
-      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 20px 16px",marginBottom:24}}>
+      <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 20px 16px",marginBottom:24,width:"100%",boxSizing:"border-box" as const}}>
+        {/* Header */}
         <div style={{fontWeight:800,fontSize:15,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
-        <div style={{fontSize:11,color:"#9ca3af",marginBottom:16}}>
+        <div style={{fontSize:11,color:"#9ca3af",marginBottom:14}}>
           10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
         </div>
 
-        <div style={{display:"flex",gap:0}}>
+        {/* Summary insight chips */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"5px 10px",fontSize:11}}>
+            <span style={{color:"#6b7280"}}>Total GMV tracked: </span>
+            <span style={{fontWeight:700,color:"#16a34a"}}>{f$(totalGmv)}</span>
+          </div>
+          {bestBucket && (
+            <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"5px 10px",fontSize:11}}>
+              <span style={{color:"#6b7280"}}>Most GMV: </span>
+              <span style={{fontWeight:700,color:"#2563eb"}}>{fmt(bestBucket.start)}–{fmt(bestBucket.end)}</span>
+              <span style={{color:"#6b7280"}}> ({f$(bestBucket.gmv)})</span>
+            </div>
+          )}
+          {bestAvgBucket && (
+            <div style={{background:"#fdf4ff",border:"1px solid #e9d5ff",borderRadius:8,padding:"5px 10px",fontSize:11}}>
+              <span style={{color:"#6b7280"}}>Best avg/video: </span>
+              <span style={{fontWeight:700,color:"#7c3aed"}}>{fmt(bestAvgBucket.start)}–{fmt(bestAvgBucket.end)}</span>
+              <span style={{color:"#6b7280"}}> ({f$(bestAvgBucket.gmv/bestAvgBucket.count)}/video)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Hover detail row */}
+        <div style={{height:32,marginBottom:4,display:"flex",alignItems:"center",gap:16,paddingLeft:44}}>
+          {hovB && hovB.count>0 ? <>
+            <span style={{fontSize:12,fontWeight:700,color:"#111"}}>{fmt(hovB.start)}–{fmt(hovB.end)}</span>
+            <span style={{fontSize:12,color:"#16a34a",fontWeight:700}}>{f$(hovB.gmv)} total GMV</span>
+            <span style={{fontSize:12,color:"#6b7280"}}>{hovB.count} video{hovB.count!==1?"s":""}</span>
+            <span style={{fontSize:12,color:"#7c3aed",fontWeight:600}}>{f$(hovB.gmv/hovB.count)} avg/video</span>
+          </> : <span style={{fontSize:11,color:"#d1d5db"}}>Hover a bar for details</span>}
+        </div>
+
+        <div style={{display:"flex",gap:0,width:"100%"}}>
           {/* Y-axis */}
           <div style={{display:"flex",flexDirection:"column",justifyContent:"space-between",alignItems:"flex-end",paddingBottom:36,paddingRight:8,flexShrink:0,height:CHART_H+36}}>
             {[...ticks].reverse().map(t=>(
@@ -1680,48 +1719,41 @@ export default function TikTokShopReporter() {
             ))}
           </div>
 
-          {/* Chart body */}
-          <div style={{flex:1,overflowX:"auto",minWidth:0}}>
-            <div style={{position:"relative",height:CHART_H,minWidth:"fit-content"}}>
+          {/* Chart body — flex so bars stretch to fill the column width */}
+          <div style={{flex:1,minWidth:0,overflowX:"auto"}}>
+            <div style={{position:"relative",height:CHART_H,display:"flex",alignItems:"flex-end"}}>
               {/* Horizontal gridlines */}
               {ticks.map((t,i)=>(
                 <div key={t} style={{
                   position:"absolute",left:0,right:0,
-                  bottom: `${(t/yMax)*100}%`,
-                  borderTop: i===0 ? "2px solid #d1d5db" : "1px dashed #e5e7eb",
+                  bottom:`${(t/yMax)*100}%`,
+                  borderTop:i===0?"2px solid #d1d5db":"1px dashed #e5e7eb",
                   zIndex:0,
                 }}/>
               ))}
 
-              {/* Bars */}
-              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:"100%",position:"relative",zIndex:1,paddingTop:4}}>
+              {/* Bars — each takes equal flex share of available width */}
+              <div style={{display:"flex",alignItems:"flex-end",width:"100%",height:"100%",gap:4,position:"relative",zIndex:1,paddingTop:6}}>
                 {lengthDist.map((b, i) => {
                   const pct = yMax > 0 ? b.gmv / yMax : 0;
                   const barH = Math.round(pct * CHART_H);
                   const isHov = hovered === i;
                   const hasData = b.gmv > 0;
+                  const isBest = bestBucket && b.start === bestBucket.start;
                   return (
-                    <div key={b.start}
-                      style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",flexShrink:0,width:52,height:"100%",cursor:"default"}}
+                    <div key={b.start} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:"100%",cursor:"default",minWidth:32}}
                       onMouseEnter={()=>setHovered(i)} onMouseLeave={()=>setHovered(null)}>
-                      {/* Hover GMV tooltip */}
-                      {isHov && hasData && (
-                        <div style={{position:"absolute",bottom:barH+6,background:"#111",color:"#fff",fontSize:10,fontWeight:700,borderRadius:5,padding:"3px 7px",whiteSpace:"nowrap",pointerEvents:"none",zIndex:10}}>
-                          {f$(b.gmv)} · {b.count}v
-                        </div>
-                      )}
                       <div style={{
-                        width:44,
-                        height: hasData ? Math.max(barH, 4) : 0,
-                        background: !hasData?"#f3f4f6": isHov?"#15803d":"#16a34a",
+                        width:"80%",
+                        height: hasData ? Math.max(barH, 4) : 2,
+                        background: !hasData?"#f3f4f6": isHov?"#15803d": isBest?"#15803d":"#16a34a",
                         borderRadius:"5px 5px 0 0",
-                        transition:"background .12s",
                         alignSelf:"flex-end",
+                        transition:"background .12s",
                         position:"relative",
                       }}>
-                        {/* Count label above bar */}
                         {b.count>0 && (
-                          <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",fontSize:10,color:"#6b7280",fontWeight:600,whiteSpace:"nowrap"}}>
+                          <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",fontSize:10,color:isHov?"#111":"#6b7280",fontWeight:600,whiteSpace:"nowrap"}}>
                             {b.count}v
                           </div>
                         )}
@@ -1732,11 +1764,11 @@ export default function TikTokShopReporter() {
               </div>
             </div>
 
-            {/* X-axis labels */}
-            <div style={{display:"flex",gap:6,paddingTop:6,minWidth:"fit-content"}}>
+            {/* X-axis labels — match bar flex layout */}
+            <div style={{display:"flex",gap:4,paddingTop:6,width:"100%"}}>
               {lengthDist.map(b=>(
-                <div key={b.start} style={{width:52,flexShrink:0,textAlign:"center"}}>
-                  <div style={{fontSize:11,color:"#374151",fontWeight:500}}>{fmt(b.start)}</div>
+                <div key={b.start} style={{flex:1,minWidth:32,textAlign:"center"}}>
+                  <div style={{fontSize:10,color:"#374151",fontWeight:500}}>{fmt(b.start)}</div>
                   <div style={{fontSize:9,color:"#d1d5db"}}>–{fmt(b.end)}</div>
                 </div>
               ))}
