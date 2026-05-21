@@ -808,23 +808,16 @@ export default function TikTokShopReporter() {
 
       // ── Visual hook options: load from settings or seed from top 17 ──
       const vhoSetting = settings?.find((s: {key:string,value:string}) => s.key === 'visual_hook_options');
+      let loadedOptions: string[] = [];
       if (vhoSetting) {
-        try { setVisualHookOptions(JSON.parse(vhoSetting.value)); } catch {}
+        try { loadedOptions = JSON.parse(vhoSetting.value); } catch {}
       } else if (adminFlag && at.length >= 1) {
         // First time: seed options from top 17 videos' visual hooks (non-empty, deduplicated)
-        const seeded: string[] = [];
         at.slice(0, 17).forEach(row => {
           const v = (row.visualHook || "").trim();
-          if (v && !seeded.includes(v)) seeded.push(v);
+          if (v && !loadedOptions.includes(v)) loadedOptions.push(v);
         });
-        setVisualHookOptions(seeded);
-        supabase.from('tiktok_hub_settings').upsert({
-          key: 'visual_hook_options',
-          value: JSON.stringify(seeded),
-          updated_at: new Date().toISOString(),
-        });
-        // Clear visual hooks for videos ranked 18+ (rank is 1-based from CSV, but
-        // array position after sort is 0-based — clear index 17 and beyond)
+        // Clear visual hooks for videos ranked 18+
         if (at.length > 17) {
           const toClear = at.slice(17).filter(row => row.visualHook);
           if (toClear.length > 0) {
@@ -837,6 +830,22 @@ export default function TikTokShopReporter() {
           }
         }
       }
+      // Always merge in any visual hook values currently on videos that aren't in the list yet
+      if (adminFlag) {
+        let changed = false;
+        at.forEach(row => {
+          const v = (row.visualHook || "").trim();
+          if (v && !loadedOptions.includes(v)) { loadedOptions.push(v); changed = true; }
+        });
+        if (changed || !vhoSetting) {
+          supabase.from('tiktok_hub_settings').upsert({
+            key: 'visual_hook_options',
+            value: JSON.stringify(loadedOptions),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      setVisualHookOptions(loadedOptions);
 
       setAllTime(at); setLastMonth(lm); setInhouse(inh);
       setPubAllTime(pat); setPubLastMonth(plm); setPubInhouse(pinh);
