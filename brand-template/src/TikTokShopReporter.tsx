@@ -1899,9 +1899,8 @@ export default function TikTokShopReporter() {
             {/* X-axis labels — match bar flex layout */}
             <div style={{display:"flex",gap:4,paddingTop:6,width:"100%"}}>
               {lengthDist.map(b=>(
-                <div key={b.start} style={{flex:1,minWidth:32,textAlign:"center"}}>
-                  <div style={{fontSize:10,color:"#374151",fontWeight:500}}>{fmt(b.start)}</div>
-                  <div style={{fontSize:9,color:"#d1d5db"}}>–{fmt(b.end)}</div>
+                <div key={b.start} style={{flex:1,minWidth:40,textAlign:"center"}}>
+                  <div style={{fontSize:9,color:"#374151",fontWeight:600,whiteSpace:"nowrap"}}>{fmt(b.start)}–{fmt(b.end)}</div>
                 </div>
               ))}
             </div>
