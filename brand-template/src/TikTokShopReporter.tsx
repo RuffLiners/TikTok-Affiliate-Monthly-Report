@@ -1089,7 +1089,7 @@ export default function TikTokShopReporter() {
     const map: Record<string, { hookText: string; videos: VideoRow[] }> = {};
     videos.forEach(v => {
       const raw = (v[field] || "").trim();
-      if (!raw) return;
+      if (!raw || raw.toLowerCase() === "none") return;
       const key = raw.toLowerCase();
       if (!map[key]) map[key] = { hookText: raw, videos: [] };
       map[key].videos.push(v);
@@ -1114,7 +1114,7 @@ export default function TikTokShopReporter() {
       const hooks = pts(v.audioHook).map(lbl).filter(Boolean);
       hooks.forEach(h => {
         const key = h.toLowerCase().trim();
-        if (!key) return;
+        if (!key || key === "none") return;
         if (!map[key]) map[key] = { hookText: h, videos: [] };
         if (!map[key].videos.includes(v)) map[key].videos.push(v);
       });
@@ -1139,7 +1139,7 @@ export default function TikTokShopReporter() {
       const product = (v.product || "").trim();
       pts(v.sellingPoints).forEach(raw => {
         const cleaned = lbl(raw).trim();
-        if (!cleaned) return;
+        if (!cleaned || cleaned.toLowerCase() === "none") return;
         const key = `${product}::${cleaned.toLowerCase()}`;
         if (!map[key]) map[key] = { point: cleaned, product, videos: [] };
         if (!map[key].videos.includes(v)) map[key].videos.push(v);
