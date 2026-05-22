@@ -1166,15 +1166,19 @@ export default function TikTokShopReporter() {
     };
     const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const byDay: {label:string;gmv:number;count:number}[] = DAYS.map(d => ({label:d,gmv:0,count:0}));
-    const byHour: {label:string;gmv:number;count:number}[] = Array.from({length:24},(_,i)=>({label:`${i}:00`,gmv:0,count:0}));
+    const fmtHour = (h: number) => { const ampm = h < 12 ? 'AM' : 'PM'; const h12 = h === 0 ? 12 : h > 12 ? h-12 : h; return `${h12}${ampm}`; };
+    const byHour: {label:string;gmv:number;count:number}[] = Array.from({length:24},(_,i)=>({label:fmtHour(i),gmv:0,count:0}));
     let hasTimeData = false;
     allTime.forEach(r => {
-      const d = parseDate(r.datePosted||'');
+      const raw = r.datePosted||'';
+      const d = parseDate(raw);
       if (!d) return;
-      byDay[d.getDay()].gmv += r.revenue; byDay[d.getDay()].count++;
-      const h = d.getHours();
-      if (h > 0 || r.datePosted?.includes(':')) { hasTimeData = true; }
-      byHour[h].gmv += r.revenue; byHour[h].count++;
+      // ISO timestamps (2025-12-06T19:07:22+00:00) include time — read UTC to preserve the posted hour
+      const hasTime = raw.includes('T') || raw.includes(' ');
+      if (hasTime) hasTimeData = true;
+      byDay[d.getUTCDay()].gmv += r.revenue; byDay[d.getUTCDay()].count++;
+      const h = hasTime ? d.getUTCHours() : 0;
+      if (hasTime) { byHour[h].gmv += r.revenue; byHour[h].count++; }
     });
     return {byDay, byHour, hasTimeData};
   }, [allTime]); // eslint-disable-line react-hooks/exhaustive-deps
