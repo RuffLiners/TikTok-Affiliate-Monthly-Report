@@ -226,14 +226,11 @@ const UP_TYPES = [
 ];
 
 const INSIGHT_TABS = [
-  {id:"efficiency",  label:"Video Efficiency",   icon:"📈", desc:"GMV per 1,000 views — which videos convert best regardless of size"},
   {id:"products",    label:"Product Breakdown",   icon:"🛍", desc:"GMV, units, and top videos broken down by product"},
-  {id:"patterns",    label:"Posting Patterns",    icon:"📅", desc:"GMV distribution by day of week and month"},
-  {id:"playbook",    label:"Creator Playbook",    icon:"💡", desc:"Hook, CTA, and efficiency patterns for top creators"},
+  {id:"patterns",    label:"Posting Patterns",    icon:"📅", desc:"GMV distribution by day of week, video length, and time of day"},
   {id:"engagement",  label:"Engagement vs GMV",   icon:"⚡", desc:"Do likes and comments actually drive sales?"},
-  {id:"conversion",  label:"Conversion Rate",     icon:"🏆", desc:"Items sold per 1,000 views — purchase conversion leaders"},
 ];
-const DEFAULT_TAB_VIS: Record<string,boolean> = {efficiency:false,products:false,patterns:false,playbook:false,engagement:false,conversion:false};
+const DEFAULT_TAB_VIS: Record<string,boolean> = {products:false,patterns:false,engagement:false};
 
 // ─── PAGE MANAGER MODAL ──────────────────────────────────────────────────────
 
@@ -245,12 +242,9 @@ function PageManagerModal({ visibility, onClose, onSave }: {
   const [vis, setVis] = React.useState({...visibility});
   const toggle = (id: string) => setVis(v => ({...v,[id]:!v[id]}));
   const INSIGHT_TABS_LOCAL = [
-    {id:"efficiency",  label:"📈 Video Efficiency",   desc:"GMV per 1,000 views — which videos convert best"},
-    {id:"products",    label:"🛍 Product Breakdown",   desc:"GMV, units, and top videos by product"},
-    {id:"patterns",    label:"📅 Posting Patterns",    desc:"GMV by day of week and month"},
-    {id:"playbook",    label:"💡 Creator Playbook",    desc:"Hook, CTA, and efficiency patterns for top creators"},
+    {id:"products",    label:"🛍 Product Breakdown",   desc:"GMV, units, and top videos by product ($1K+ GMV only)"},
+    {id:"patterns",    label:"📅 Posting Patterns",    desc:"GMV by day of week, video length, and time of day"},
     {id:"engagement",  label:"⚡ Engagement vs GMV",   desc:"Do likes and comments actually drive sales?"},
-    {id:"conversion",  label:"🏆 Conversion Rate",     desc:"Items sold per 1,000 views — purchase conversion leaders"},
   ];
   return (
     <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
@@ -1139,25 +1133,30 @@ export default function TikTokShopReporter() {
 
   // ── Insight page data ────────────────────────────────────────────────────────
 
-  const MIN_VIEWS = 5000;
-
-  const efficiencyData = useMemo(() =>
-    src.filter(r => r.views >= MIN_VIEWS)
-       .map(r => ({...r, effPer1k: (r.revenue / r.views) * 1000}))
-       .sort((a,b) => b.effPer1k - a.effPer1k),
-  [src]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const productData = useMemo(() => {
-    const map: Record<string,{product:string;gmv:number;units:number;count:number;creators:Set<string>;videos:VideoRow[]}> = {};
+    const map: Record<string,{product:string;gmv:number;units:number;count:number;creators:Set<string>;topVideos:VideoRow[]}> = {};
     src.forEach(r => {
-      const p = (r.product||"Unknown").trim();
-      if (!map[p]) map[p] = {product:p,gmv:0,units:0,count:0,creators:new Set(),videos:[]};
+      const p = (r.product||"").trim();
+      if (!p || p.toLowerCase() === "unknown") return;
+      if (!map[p]) map[p] = {product:p,gmv:0,units:0,count:0,creators:new Set(),topVideos:[]};
       map[p].gmv += r.revenue; map[p].units += r.itemsSold; map[p].count++;
       map[p].creators.add(r.creator);
-      if (map[p].videos.length < 5) map[p].videos.push(r);
+    });
+    // For each product, find top 5 videos with >= $1K GMV, sorted by revenue desc
+    src.forEach(r => {
+      const p = (r.product||"").trim();
+      if (!p || p.toLowerCase() === "unknown") return;
+      if (r.revenue < 1000) return;
+      if (!map[p]) return;
+      map[p].topVideos.push(r);
     });
     return Object.values(map)
-      .map(p => ({...p, creatorCount:p.creators.size, avgGmv: p.gmv/p.count, creators: undefined}))
+      .filter(p => p.gmv >= 1000)
+      .map(p => ({
+        product: p.product, gmv: p.gmv, units: p.units, count: p.count,
+        creatorCount: p.creators.size, avgGmv: p.gmv/p.count,
+        videos: p.topVideos.sort((a,b)=>b.revenue-a.revenue).slice(0,5),
+      }))
       .sort((a,b) => b.gmv - a.gmv);
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1168,47 +1167,23 @@ export default function TikTokShopReporter() {
       return isNaN(d.getTime()) ? null : d;
     };
     const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const byDay: {label:string;gmv:number;count:number}[] = DAYS.map(d => ({label:d,gmv:0,count:0}));
-    const byMonth: {label:string;gmv:number;count:number}[] = MONTHS.map(m => ({label:m,gmv:0,count:0}));
+    const byHour: {label:string;gmv:number;count:number}[] = Array.from({length:24},(_,i)=>({label:`${i}:00`,gmv:0,count:0}));
+    let hasTimeData = false;
     src.forEach(r => {
       const d = parseDate(r.datePosted||'');
       if (!d) return;
       byDay[d.getDay()].gmv += r.revenue; byDay[d.getDay()].count++;
-      byMonth[d.getMonth()].gmv += r.revenue; byMonth[d.getMonth()].count++;
+      const h = d.getHours();
+      if (h > 0 || r.datePosted?.includes(':')) { hasTimeData = true; }
+      byHour[h].gmv += r.revenue; byHour[h].count++;
     });
-    return {byDay, byMonth};
-  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const playbookData = useMemo(() => {
-    const map: Record<string,{creator:string;gmv:number;views:number;count:number;lengths:number[];hooks:Record<string,number>;ctas:Record<string,number>;products:Record<string,number>}> = {};
-    src.forEach(r => {
-      const k = r.creator.toLowerCase().trim();
-      if (!map[k]) map[k] = {creator:r.creator,gmv:0,views:0,count:0,lengths:[],hooks:{},ctas:{},products:{}};
-      const e = map[k];
-      e.gmv += r.revenue; e.views += r.views; e.count++;
-      const ls = parseLengthSecs(r.videoLength||''); if (ls) e.lengths.push(ls);
-      if (r.visualHook) e.hooks[r.visualHook] = (e.hooks[r.visualHook]||0)+1;
-      if (r.cta) e.ctas[r.cta] = (e.ctas[r.cta]||0)+1;
-      if (r.product) e.products[r.product] = (e.products[r.product]||0)+1;
-    });
-    const topKey = (obj: Record<string,number>) => Object.entries(obj).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
-    return Object.values(map)
-      .filter(c => c.count >= 2)
-      .map(c => ({
-        creator: c.creator, gmv: c.gmv, count: c.count,
-        avgGmv: c.gmv/c.count,
-        convRate: c.views > 0 ? (c.gmv/c.views)*1000 : 0,
-        avgLengthSecs: c.lengths.length ? Math.round(c.lengths.reduce((a,b)=>a+b,0)/c.lengths.length) : 0,
-        topHook: topKey(c.hooks), topCta: topKey(c.ctas), topProduct: topKey(c.products),
-      }))
-      .sort((a,b) => b.gmv - a.gmv)
-      .slice(0, 15);
+    return {byDay, byHour, hasTimeData};
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const engagementData = useMemo(() => {
     const likeBuckets = [
-      {label:'0',min:0,max:0},{label:'1–99',min:1,max:99},{label:'100–999',min:100,max:999},
+      {label:'0–49',min:0,max:49},{label:'50–100',min:50,max:100},{label:'100–999',min:101,max:999},
       {label:'1K–9.9K',min:1000,max:9999},{label:'10K–99K',min:10000,max:99999},{label:'100K+',min:100000,max:Infinity}
     ].map(b => ({...b,gmv:0,count:0,units:0}));
     src.forEach(r => {
@@ -1217,16 +1192,40 @@ export default function TikTokShopReporter() {
     });
     const noGmv = src.filter(r => r.revenue === 0);
     const withGmv = src.filter(r => r.revenue > 0);
-    return {likeBuckets: likeBuckets.filter(b=>b.count>0), noGmv: noGmv.length, withGmv: withGmv.length,
+    // Watch time proxy: avg engagement rate (likes/views %) by video length bucket
+    const lengthBuckets = [
+      {label:'0–30s',min:0,max:30},{label:'31–60s',min:31,max:60},{label:'61–90s',min:61,max:90},
+      {label:'91–120s',min:91,max:120},{label:'2–3m',min:121,max:180},{label:'3m+',min:181,max:Infinity}
+    ].map(b => ({...b,engRates:[] as number[]}));
+    src.forEach(r => {
+      if (!r.views || r.views === 0) return;
+      const secs = parseLengthSecs(r.videoLength||'');
+      if (secs === null) return;
+      const b = lengthBuckets.find(b => secs >= b.min && secs <= b.max);
+      if (b) b.engRates.push((r.likes / r.views) * 100);
+    });
+    const lengthEngagement = lengthBuckets
+      .map(b => ({label:b.label, avgEngRate: b.engRates.length ? b.engRates.reduce((a,c)=>a+c,0)/b.engRates.length : 0, count: b.engRates.length}))
+      .filter(b => b.count > 0);
+    // Hook retention proxy: avg engagement rate per visual hook
+    const hookMap: Record<string,number[]> = {};
+    src.forEach(r => {
+      if (!r.views || r.views === 0 || !r.visualHook) return;
+      if (!hookMap[r.visualHook]) hookMap[r.visualHook] = [];
+      hookMap[r.visualHook].push((r.likes / r.views) * 100);
+    });
+    const hookEngagement = Object.entries(hookMap)
+      .map(([hook,rates]) => ({hook, avgEngRate: rates.reduce((a,c)=>a+c,0)/rates.length, count: rates.length}))
+      .filter(h => h.count >= 2)
+      .sort((a,b) => b.avgEngRate - a.avgEngRate)
+      .slice(0, 10);
+    return {
+      likeBuckets: likeBuckets.filter(b=>b.count>0), noGmv: noGmv.length, withGmv: withGmv.length,
       avgLikesWithGmv: withGmv.length ? Math.round(withGmv.reduce((s,r)=>s+r.likes,0)/withGmv.length) : 0,
-      avgLikesNoGmv:   noGmv.length   ? Math.round(noGmv.reduce((s,r)=>s+r.likes,0)/noGmv.length)   : 0};
+      avgLikesNoGmv:   noGmv.length   ? Math.round(noGmv.reduce((s,r)=>s+r.likes,0)/noGmv.length)   : 0,
+      lengthEngagement, hookEngagement,
+    };
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const conversionData = useMemo(() =>
-    src.filter(r => r.views >= MIN_VIEWS)
-       .map(r => ({...r, convPer1k: (r.itemsSold / r.views) * 1000}))
-       .sort((a,b) => b.convPer1k - a.convPer1k),
-  [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // GMV distribution by video length in 10-second buckets
   const lengthDist = useMemo(() => {
@@ -2387,10 +2386,9 @@ export default function TikTokShopReporter() {
                   <HookSection hooks={topAudioHooks}  icon="🎵" title="Audio Hooks"  accent="#d97706"/>
                 </div>
 
-                {/* ── Right col: Chart + CTAs + Selling Points ── */}
+                {/* ── Right col: CTAs + Selling Points ── */}
                 <div>
-                  <LengthDistChart />
-                  <div style={{marginBottom:8,marginTop:24}}>
+                  <div style={{marginBottom:8}}>
                     <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
                     <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Top CTAs by cumulative GMV across all all-time videos</div>
                   </div>
@@ -2416,32 +2414,13 @@ export default function TikTokShopReporter() {
             </>
         )}
 
-        {tab==="efficiency" && (
-          efficiencyData.length===0
-            ? <Empty msg='Upload the All-Time report to see video efficiency data'/>
-            : <>
-              <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",padding:"14px 20px",marginBottom:16,display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
-                <div><div style={{fontSize:10,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>Videos ranked</div><div style={{fontWeight:800,fontSize:20,color:"#111"}}>{efficiencyData.length}</div></div>
-                <div><div style={{fontSize:10,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>Min views filter</div><div style={{fontWeight:800,fontSize:20,color:"#111"}}>{fK(MIN_VIEWS)}</div></div>
-                <div style={{fontSize:12,color:"#6b7280",flex:1}}>Videos ranked by GMV earned per 1,000 views — shows which content converts viewers into buyers most efficiently, regardless of total view count.</div>
-              </div>
-              <div className="rl-two-col">
-                {efficiencyData.map((r,i) => (
-                  <div key={r.id} style={{position:"relative"}}>
-                    <div style={{position:"absolute",top:12,right:12,zIndex:2,background:"#0891b2",color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700}}>
-                      {f$((r as any).effPer1k)}/1K views
-                    </div>
-                    <VideoCard r={r} showFilter={false} {...cardProps}/>
-                  </div>
-                ))}
-              </div>
-            </>
-        )}
-
         {tab==="products" && (
           productData.length===0
             ? <Empty msg='Upload the All-Time report to see product breakdown'/>
             : <>
+              <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",padding:"12px 18px",marginBottom:16,fontSize:12,color:"#6b7280"}}>
+                Showing products with total GMV ≥ $1K. Top 5 videos (≥$1K each) shown per product, ranked by revenue.
+              </div>
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
                 {productData.map((p,i) => (
                   <div key={p.product} style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",overflow:"hidden"}}>
@@ -2460,7 +2439,7 @@ export default function TikTokShopReporter() {
                     </div>
                     {p.videos.length>0 && (
                       <div style={{borderTop:"1px solid #f3f4f6",padding:"12px 20px"}}>
-                        <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Top Videos</div>
+                        <div style={{fontSize:10,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:10}}>Top Videos (≥$1K GMV)</div>
                         <div className="rl-two-col">
                           {p.videos.map(v=><VideoCard key={v.id} r={v} showFilter={false} {...cardProps}/>)}
                         </div>
@@ -2476,14 +2455,14 @@ export default function TikTokShopReporter() {
           src.length===0
             ? <Empty msg='Upload the All-Time report to see posting patterns'/>
             : (() => {
-              const {byDay, byMonth} = patternsData;
+              const {byDay, byHour, hasTimeData} = patternsData;
               const maxDay = Math.max(...byDay.map(b=>b.gmv));
-              const maxMonth = Math.max(...byMonth.map(b=>b.gmv));
-              const PatBar = ({label,gmv,count,max}:{label:string;gmv:number;count:number;max:number}) => {
+              const maxHour = Math.max(...byHour.map(b=>b.gmv));
+              const PatBar = ({label,gmv,count,max,labelWidth}:{label:string;gmv:number;count:number;max:number;labelWidth?:number}) => {
                 const pct = max>0?gmv/max:0;
                 return (
                   <div style={{display:"flex",alignItems:"center",gap:12,padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
-                    <div style={{width:48,fontSize:12,color:"#374151",fontWeight:500,flexShrink:0}}>{label}</div>
+                    <div style={{width:labelWidth||48,fontSize:12,color:"#374151",fontWeight:500,flexShrink:0}}>{label}</div>
                     <div style={{flex:1,background:"#f3f4f6",borderRadius:4,height:20,overflow:"hidden"}}>
                       <div style={{width:`${pct*100}%`,height:"100%",background:pct>0.85?"#15803d":"#16a34a",borderRadius:4,minWidth:pct>0?4:0,transition:"width .3s"}}/>
                     </div>
@@ -2494,128 +2473,123 @@ export default function TikTokShopReporter() {
               };
               const dated = src.filter(r=>r.datePosted);
               return (
-                <div className="rl-hooks-grid">
-                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
-                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📅 GMV by Day of Week</div>
-                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>{dated.length} videos with date data</div>
-                    {byDay.map(b=><PatBar key={b.label} label={b.label.slice(0,3)} gmv={b.gmv} count={b.count} max={maxDay}/>)}
+                <div style={{display:"flex",flexDirection:"column",gap:20}}>
+                  <div className="rl-hooks-grid">
+                    <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                      <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📅 GMV by Day of Week</div>
+                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>{dated.length} videos with date data</div>
+                      {byDay.map(b=><PatBar key={b.label} label={b.label.slice(0,3)} gmv={b.gmv} count={b.count} max={maxDay}/>)}
+                    </div>
+                    <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                      <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⏰ GMV by Time of Day Posted</div>
+                      {hasTimeData
+                        ? <>
+                            <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>Which posting hours drive the most revenue?</div>
+                            {byHour.filter(b=>b.count>0).map(b=>(
+                              <PatBar key={b.label} label={b.label} gmv={b.gmv} count={b.count} max={maxHour} labelWidth={56}/>
+                            ))}
+                            {byHour.every(b=>b.count===0) && <div style={{fontSize:12,color:"#9ca3af",padding:"20px 0",textAlign:"center"}}>No time data found in datePosted field.</div>}
+                          </>
+                        : <div style={{fontSize:12,color:"#9ca3af",padding:"24px 0",lineHeight:1.7}}>
+                            Time-of-day data not available — the TikTok Shop export only includes the date (YYYY-MM-DD), not the time of posting. If you have a source with timestamps, re-upload to see this chart.
+                          </div>
+                      }
+                    </div>
                   </div>
-                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
-                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>🗓 GMV by Month</div>
-                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>When do top-performing videos get posted?</div>
-                    {byMonth.map(b=><PatBar key={b.label} label={b.label} gmv={b.gmv} count={b.count} max={maxMonth}/>)}
-                  </div>
+                  <LengthDistChart />
                 </div>
               );
             })()
         )}
 
-        {tab==="playbook" && (
-          playbookData.length===0
-            ? <Empty msg='Upload the All-Time report and fill in hook/CTA fields to see the creator playbook'/>
-            : <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",overflow:"hidden"}}>
-                <div style={{padding:"18px 20px",borderBottom:"1px solid #f3f4f6"}}>
-                  <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>💡 Creator Playbook</div>
-                  <div style={{fontSize:12,color:"#9ca3af"}}>Top creators by GMV — their patterns, hooks, and efficiency metrics</div>
-                </div>
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                    <thead>
-                      <tr style={{background:"#f9fafb"}}>
-                        {["#","Creator","Total GMV","Avg GMV/Video","GMV/1K Views","Videos","Avg Length","Top Visual Hook","Top CTA"].map(h=>(
-                          <th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap",borderBottom:"1px solid #e5e7eb"}}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {playbookData.map((c,i)=>{
-                        const fmtSecs = (s:number) => s===0?'—': s<60?`${s}s`:`${Math.floor(s/60)}m${s%60?`${s%60}s`:''}`;
-                        return (
-                          <tr key={c.creator} style={{borderBottom:"1px solid #f3f4f6",background:i%2===0?"#fff":"#fafafa"}}>
-                            <td style={{padding:"12px 14px",fontWeight:700,color:"#6b7280"}}>#{i+1}</td>
-                            <td style={{padding:"12px 14px",fontWeight:700,color:"#111",whiteSpace:"nowrap"}}>@{c.creator}</td>
-                            <td style={{padding:"12px 14px",fontWeight:700,color:"#16a34a",whiteSpace:"nowrap"}}>{f$(c.gmv)}</td>
-                            <td style={{padding:"12px 14px",color:"#2563eb",fontWeight:600,whiteSpace:"nowrap"}}>{f$(c.avgGmv)}</td>
-                            <td style={{padding:"12px 14px",color:"#7c3aed",fontWeight:600,whiteSpace:"nowrap"}}>{f$(c.convRate)}</td>
-                            <td style={{padding:"12px 14px",color:"#374151"}}>{c.count}</td>
-                            <td style={{padding:"12px 14px",color:"#374151",whiteSpace:"nowrap"}}>{fmtSecs(c.avgLengthSecs)}</td>
-                            <td style={{padding:"12px 14px",color:"#374151",maxWidth:180}}><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.topHook}</div></td>
-                            <td style={{padding:"12px 14px",color:"#374151",maxWidth:180}}><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.topCta}</div></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-        )}
-
         {tab==="engagement" && (
           engagementData.likeBuckets.length===0
             ? <Empty msg='Upload the All-Time report to see engagement analysis'/>
-            : <div className="rl-hooks-grid">
-                <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
-                  <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⚡ GMV by Like Count</div>
-                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Does engagement drive revenue?</div>
-                  {(() => {
-                    const maxGmv = Math.max(...engagementData.likeBuckets.map(b=>b.gmv));
-                    return engagementData.likeBuckets.map(b=>(
-                      <div key={b.label} style={{marginBottom:14}}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                          <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>👍 {b.label} likes</span>
-                          <span style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{f$(b.gmv)} <span style={{color:"#9ca3af",fontWeight:400}}>· {b.count}v · avg {f$(b.gmv/b.count)}</span></span>
+            : <div style={{display:"flex",flexDirection:"column",gap:20}}>
+                <div className="rl-hooks-grid">
+                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⚡ GMV by Like Count</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Does engagement drive revenue?</div>
+                    {(() => {
+                      const maxGmv = Math.max(...engagementData.likeBuckets.map(b=>b.gmv));
+                      return engagementData.likeBuckets.map(b=>(
+                        <div key={b.label} style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                            <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>👍 {b.label} likes</span>
+                            <span style={{fontSize:12,fontWeight:700,color:"#16a34a"}}>{f$(b.gmv)} <span style={{color:"#9ca3af",fontWeight:400}}>· {b.count}v · avg {f$(b.gmv/b.count)}</span></span>
+                          </div>
+                          <div style={{background:"#f3f4f6",borderRadius:6,height:24,overflow:"hidden"}}>
+                            <div style={{width:`${(b.gmv/maxGmv)*100}%`,height:"100%",background:"#16a34a",borderRadius:6,minWidth:b.gmv>0?4:0}}/>
+                          </div>
                         </div>
-                        <div style={{background:"#f3f4f6",borderRadius:6,height:24,overflow:"hidden"}}>
-                          <div style={{width:`${(b.gmv/maxGmv)*100}%`,height:"100%",background:"#16a34a",borderRadius:6,minWidth:b.gmv>0?4:0}}/>
-                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 Engagement Insight</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Videos with GMV vs without</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                      <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"16px 18px"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#15803d",marginBottom:6}}>✅ Videos with GMV ({engagementData.withGmv})</div>
+                        <div style={{fontSize:12,color:"#374151"}}>Avg likes: <strong>{fN(engagementData.avgLikesWithGmv)}</strong></div>
                       </div>
-                    ));
-                  })()}
-                </div>
-                <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
-                  <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📊 Engagement Insight</div>
-                  <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Videos with GMV vs without</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                    <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"16px 18px"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:"#15803d",marginBottom:6}}>✅ Videos with GMV ({engagementData.withGmv})</div>
-                      <div style={{fontSize:12,color:"#374151"}}>Avg likes: <strong>{fN(engagementData.avgLikesWithGmv)}</strong></div>
-                    </div>
-                    <div style={{background:"#fafafa",border:"1px solid #e5e7eb",borderRadius:10,padding:"16px 18px"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:"#6b7280",marginBottom:6}}>⭕ Videos with $0 GMV ({engagementData.noGmv})</div>
-                      <div style={{fontSize:12,color:"#374151"}}>Avg likes: <strong>{fN(engagementData.avgLikesNoGmv)}</strong></div>
-                    </div>
-                    <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"16px 18px"}}>
-                      <div style={{fontSize:12,color:"#2563eb",lineHeight:1.6}}>
-                        {engagementData.avgLikesWithGmv > engagementData.avgLikesNoGmv
-                          ? `Videos that earn GMV average ${fN(engagementData.avgLikesWithGmv - engagementData.avgLikesNoGmv)} more likes than zero-GMV videos — engagement and sales are correlated.`
-                          : `Zero-GMV videos actually average more likes — engagement alone doesn't predict sales. Strong CTAs and product fit matter more.`}
+                      <div style={{background:"#fafafa",border:"1px solid #e5e7eb",borderRadius:10,padding:"16px 18px"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#6b7280",marginBottom:6}}>⭕ Videos with $0 GMV ({engagementData.noGmv})</div>
+                        <div style={{fontSize:12,color:"#374151"}}>Avg likes: <strong>{fN(engagementData.avgLikesNoGmv)}</strong></div>
+                      </div>
+                      <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"16px 18px"}}>
+                        <div style={{fontSize:12,color:"#2563eb",lineHeight:1.6}}>
+                          {engagementData.avgLikesWithGmv > engagementData.avgLikesNoGmv
+                            ? `Videos that earn GMV average ${fN(engagementData.avgLikesWithGmv - engagementData.avgLikesNoGmv)} more likes than zero-GMV videos — engagement and sales are correlated.`
+                            : `Zero-GMV videos actually average more likes — engagement alone doesn't predict sales. Strong CTAs and product fit matter more.`}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-        )}
-
-        {tab==="conversion" && (
-          conversionData.length===0
-            ? <Empty msg='Upload the All-Time report to see conversion rate data'/>
-            : <>
-              <div style={{background:"#fff",borderRadius:12,border:"1px solid #e5e7eb",padding:"14px 20px",marginBottom:16,display:"flex",gap:24,flexWrap:"wrap",alignItems:"center"}}>
-                <div><div style={{fontSize:10,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>Videos ranked</div><div style={{fontWeight:800,fontSize:20,color:"#111"}}>{conversionData.length}</div></div>
-                <div><div style={{fontSize:10,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>Min views filter</div><div style={{fontWeight:800,fontSize:20,color:"#111"}}>{fK(MIN_VIEWS)}</div></div>
-                <div style={{fontSize:12,color:"#6b7280",flex:1}}>Videos ranked by items sold per 1,000 views — shows which content drives purchase intent most effectively.</div>
-              </div>
-              <div className="rl-two-col">
-                {conversionData.map((r,i) => (
-                  <div key={r.id} style={{position:"relative"}}>
-                    <div style={{position:"absolute",top:12,right:12,zIndex:2,background:"#dc2626",color:"#fff",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700}}>
-                      {(r as any).convPer1k.toFixed(2)} sold/1K views
-                    </div>
-                    <VideoCard r={r} showFilter={false} {...cardProps}/>
+                {/* Watch time proxy: avg engagement rate by video length */}
+                {engagementData.lengthEngagement.length > 0 && (
+                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⏱ Watch Time Analysis — Engagement Rate by Video Length</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Avg likes/views % by length bucket — a proxy for how well viewers watch through to the end. Higher % = more engaging throughout.</div>
+                    {(() => {
+                      const maxRate = Math.max(...engagementData.lengthEngagement.map(b=>b.avgEngRate));
+                      return engagementData.lengthEngagement.map(b=>(
+                        <div key={b.label} style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                            <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>{b.label}</span>
+                            <span style={{fontSize:12,fontWeight:700,color:"#7c3aed"}}>{b.avgEngRate.toFixed(2)}% <span style={{color:"#9ca3af",fontWeight:400}}>· {b.count} videos</span></span>
+                          </div>
+                          <div style={{background:"#f3f4f6",borderRadius:6,height:20,overflow:"hidden"}}>
+                            <div style={{width:`${maxRate>0?(b.avgEngRate/maxRate)*100:0}%`,height:"100%",background:"#7c3aed",borderRadius:6,minWidth:b.avgEngRate>0?4:0}}/>
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
-                ))}
+                )}
+                {/* Hook retention proxy: avg engagement rate per visual hook */}
+                {engagementData.hookEngagement.length > 0 && (
+                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>🪝 Hook Retention Analysis — Engagement Rate by Visual Hook</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>Avg likes/views % by hook type (min 2 videos) — hooks with higher engagement rates tend to keep viewers watching longer and drive more interaction.</div>
+                    {(() => {
+                      const maxRate = Math.max(...engagementData.hookEngagement.map(h=>h.avgEngRate));
+                      return engagementData.hookEngagement.map(h=>(
+                        <div key={h.hook} style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                            <span style={{fontSize:12,fontWeight:600,color:"#374151",maxWidth:"60%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.hook}</span>
+                            <span style={{fontSize:12,fontWeight:700,color:"#0891b2"}}>{h.avgEngRate.toFixed(2)}% <span style={{color:"#9ca3af",fontWeight:400}}>· {h.count} videos</span></span>
+                          </div>
+                          <div style={{background:"#f3f4f6",borderRadius:6,height:20,overflow:"hidden"}}>
+                            <div style={{width:`${maxRate>0?(h.avgEngRate/maxRate)*100:0}%`,height:"100%",background:"#0891b2",borderRadius:6,minWidth:h.avgEngRate>0?4:0}}/>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
               </div>
-            </>
         )}
 
       </div>
