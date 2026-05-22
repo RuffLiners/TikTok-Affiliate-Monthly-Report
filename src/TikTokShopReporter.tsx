@@ -1198,13 +1198,13 @@ export default function TikTokShopReporter() {
     return {byDay, byHour, hasTimeData};
   }, [allTime]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // GMV distribution by video length in 10-second buckets
+  // GMV distribution by video length in 5-second buckets
   const lengthDist = useMemo(() => {
     const buckets: Record<number, {gmv: number; count: number}> = {};
     src.forEach(r => {
       const secs = parseLengthSecs(r.videoLength || "");
       if (secs === null || secs <= 0) return;
-      const bucket = Math.floor(secs / 10) * 10;
+      const bucket = Math.floor(secs / 5) * 5;
       if (!buckets[bucket]) buckets[bucket] = {gmv:0, count:0};
       buckets[bucket].gmv += r.revenue;
       buckets[bucket].count += 1;
@@ -1212,8 +1212,8 @@ export default function TikTokShopReporter() {
     if (!Object.keys(buckets).length) return [];
     const max = Math.max(...Object.keys(buckets).map(Number));
     const result = [];
-    for (let b = 0; b <= max; b += 10) {
-      result.push({ start: b, end: b+10, gmv: buckets[b]?.gmv||0, count: buckets[b]?.count||0 });
+    for (let b = 0; b <= max; b += 5) {
+      result.push({ start: b, end: b+5, gmv: buckets[b]?.gmv||0, count: buckets[b]?.count||0 });
     }
     return result;
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1786,7 +1786,7 @@ export default function TikTokShopReporter() {
     const maxGmv = Math.max(...lengthDist.map(b => b.gmv));
     const CHART_H = 220;
     const Y_TICKS = 5;
-    const fmt = (s: number) => s === 0 ? "0s" : s < 60 ? `${s}s` : `${Math.floor(s/60)}m${s%60?`${s%60}s`:""}`;
+    const fmt = (s: number) => `${s}s`;
     const totalVideos = lengthDist.reduce((s,b)=>s+b.count,0);
     const totalGmv = lengthDist.reduce((s,b)=>s+b.gmv,0);
     const activeBuckets = lengthDist.filter(b=>b.count>0);
@@ -1808,7 +1808,7 @@ export default function TikTokShopReporter() {
         {/* Header */}
         <div style={{fontWeight:800,fontSize:15,color:"#111",marginBottom:2}}>📊 GMV by Video Length</div>
         <div style={{fontSize:11,color:"#9ca3af",marginBottom:14}}>
-          10-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
+          5-second intervals · {totalVideos} video{totalVideos!==1?"s":""} with length data
         </div>
 
         {/* Summary insight chips */}
