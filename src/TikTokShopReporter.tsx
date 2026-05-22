@@ -158,7 +158,7 @@ const parseCSV = (text: string, source: string): VideoRow[] => {
       description: desc,
       hashtags: tags,
       product: (r.Product||"").trim(),
-      datePosted: (r.Date||"").slice(0,10),
+      datePosted: (r.Date||"").trim(),
       audioHook:    C(r.Hooks||""),
       textHook:     "",
       sellingPoints:C(r["Selling Points"]||""),
