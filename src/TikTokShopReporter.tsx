@@ -2442,32 +2442,34 @@ export default function TikTokShopReporter() {
                   </div>
                 );
               };
-              const dated = src.filter(r=>r.datePosted);
+              const dated = allTime.filter(r=>r.datePosted);
               return (
-                <div style={{display:"flex",flexDirection:"column",gap:20}}>
-                  <div className="rl-hooks-grid">
+                <div className="rl-hooks-grid" style={{alignItems:"start"}}>
+                  {/* Left col: Day of Week + Video Length stacked */}
+                  <div style={{display:"flex",flexDirection:"column",gap:20}}>
                     <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
                       <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>📅 GMV by Day of Week</div>
-                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>{dated.length} videos with date data</div>
+                      <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>{dated.length.toLocaleString()} videos with date data</div>
                       {byDay.map(b=><PatBar key={b.label} label={b.label.slice(0,3)} gmv={b.gmv} count={b.count} max={maxDay}/>)}
                     </div>
-                    <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
-                      <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⏰ GMV by Time of Day Posted</div>
-                      {hasTimeData
-                        ? <>
-                            <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>Which posting hours drive the most revenue?</div>
-                            {byHour.filter(b=>b.count>0).map(b=>(
-                              <PatBar key={b.label} label={b.label} gmv={b.gmv} count={b.count} max={maxHour} labelWidth={56}/>
-                            ))}
-                            {byHour.every(b=>b.count===0) && <div style={{fontSize:12,color:"#9ca3af",padding:"20px 0",textAlign:"center"}}>No time data found in datePosted field.</div>}
-                          </>
-                        : <div style={{fontSize:12,color:"#9ca3af",padding:"24px 0",lineHeight:1.7}}>
-                            Time-of-day data not available — the TikTok Shop export only includes the date (YYYY-MM-DD), not the time of posting. If you have a source with timestamps, re-upload to see this chart.
-                          </div>
-                      }
-                    </div>
+                    <LengthDistChart />
                   </div>
-                  <LengthDistChart />
+                  {/* Right col: Time of Day (tall, fills the space) */}
+                  <div style={{background:"#fff",borderRadius:14,border:"1px solid #e5e7eb",padding:"20px 24px"}}>
+                    <div style={{fontWeight:800,fontSize:16,color:"#111",marginBottom:2}}>⏰ GMV by Time of Day Posted</div>
+                    {hasTimeData
+                      ? <>
+                          <div style={{fontSize:12,color:"#9ca3af",marginBottom:16}}>Which posting hours drive the most revenue?</div>
+                          {byHour.filter(b=>b.count>0).map(b=>(
+                            <PatBar key={b.label} label={b.label} gmv={b.gmv} count={b.count} max={maxHour} labelWidth={56}/>
+                          ))}
+                          {byHour.every(b=>b.count===0) && <div style={{fontSize:12,color:"#9ca3af",padding:"20px 0",textAlign:"center"}}>No time data found in datePosted field.</div>}
+                        </>
+                      : <div style={{fontSize:12,color:"#9ca3af",padding:"24px 0",lineHeight:1.7}}>
+                          Time-of-day data not available — the TikTok Shop export only includes the date (YYYY-MM-DD), not the time of posting. If you have a source with timestamps, re-upload to see this chart.
+                        </div>
+                    }
+                  </div>
                 </div>
               );
             })()
