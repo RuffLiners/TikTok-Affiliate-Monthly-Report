@@ -293,39 +293,45 @@ function PageManagerModal({ visibility, onClose, onSave }: {
 
 // ─── VISUAL HOOK MANAGER MODAL ───────────────────────────────────────────────
 
-function VHManagerModal({ options, onClose, onSave }: {
+function VHManagerModal({ options, usageCounts, onClose, onSave }: {
   options: string[];
+  usageCounts: Record<string, number>;
   onClose: () => void;
-  onSave: (next: string[]) => void;
+  onSave: (next: string[], renames: Record<string,string>) => void;
 }) {
   const [items, setItems] = React.useState<string[]>(options);
+  const [renames, setRenames] = React.useState<Record<string,string>>({});
   const [editIdx, setEditIdx] = React.useState<number|null>(null);
   const [editVal, setEditVal] = React.useState("");
   const [newVal, setNewVal] = React.useState("");
 
-  const startEdit = (i: number) => { setEditIdx(i); setEditVal(items[i]); };
-  const commitEdit = (i: number) => {
+  // Always display alphabetically
+  const sorted = [...items].sort((a, b) => a.localeCompare(b));
+
+  const startEdit = (opt: string) => { setEditIdx(items.indexOf(opt)); setEditVal(opt); };
+  const commitEdit = (opt: string) => {
     const v = editVal.trim();
-    if (!v) return;
-    setItems(prev => prev.map((x,idx) => idx===i ? v : x));
+    if (!v || v === opt) { setEditIdx(null); return; }
+    setItems(prev => prev.map(x => x===opt ? v : x));
+    // Track the rename chain: if opt was itself already a rename target, update the chain
+    setRenames(prev => {
+      const next = {...prev};
+      // Find if any existing rename points to opt, update it to v
+      Object.keys(next).forEach(k => { if (next[k] === opt) next[k] = v; });
+      next[opt] = v;
+      return next;
+    });
     setEditIdx(null);
   };
-  const deleteItem = (i: number) => {
-    setItems(prev => prev.filter((_,idx) => idx!==i));
-    if (editIdx===i) setEditIdx(null);
+  const deleteItem = (opt: string) => {
+    setItems(prev => prev.filter(x => x!==opt));
+    setEditIdx(null);
   };
   const addNew = () => {
     const v = newVal.trim();
     if (!v || items.includes(v)) return;
     setItems(prev => [...prev, v]);
     setNewVal("");
-  };
-  const moveUp = (i: number) => {
-    if (i===0) return;
-    setItems(prev => { const a=[...prev]; [a[i-1],a[i]]=[a[i],a[i-1]]; return a; });
-  };
-  const moveDown = (i: number) => {
-    setItems(prev => { if (i>=prev.length-1) return prev; const a=[...prev]; [a[i],a[i+1]]=[a[i+1],a[i]]; return a; });
   };
 
   return (
@@ -338,54 +344,61 @@ function VHManagerModal({ options, onClose, onSave }: {
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#9ca3af",padding:"0 4px",lineHeight:1}}>✕</button>
         </div>
 
-        {/* List */}
+        {/* List — alphabetical, None pinned first */}
         <div style={{flex:1,overflowY:"auto",padding:"12px 24px"}}>
           {items.length===0 && (
             <div style={{textAlign:"center",padding:"32px 0",color:"#9ca3af",fontSize:13}}>No options yet — add one below.</div>
           )}
-          {items.map((opt, i) => (
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
-              {/* Up/down */}
-              <div style={{display:"flex",flexDirection:"column",gap:1}}>
-                <button onClick={()=>moveUp(i)} disabled={i===0}
-                  style={{background:"none",border:"none",cursor:i===0?"not-allowed":"pointer",color:i===0?"#d1d5db":"#9ca3af",fontSize:10,padding:"1px 3px",lineHeight:1}}>▲</button>
-                <button onClick={()=>moveDown(i)} disabled={i===items.length-1}
-                  style={{background:"none",border:"none",cursor:i===items.length-1?"not-allowed":"pointer",color:i===items.length-1?"#d1d5db":"#9ca3af",fontSize:10,padding:"1px 3px",lineHeight:1}}>▼</button>
+          {sorted.map((opt) => {
+            const idx = items.indexOf(opt);
+            const count = usageCounts[opt] || 0;
+            const isEditing = editIdx === idx;
+            return (
+              <div key={opt} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f3f4f6"}}>
+                {/* Usage count badge */}
+                <div style={{
+                  minWidth:32,textAlign:"center",padding:"2px 7px",borderRadius:20,fontSize:11,fontWeight:700,
+                  background: count===0 ? "#fee2e2" : "#f0fdf4",
+                  color: count===0 ? "#dc2626" : "#16a34a",
+                  flexShrink:0,
+                }}>
+                  {count}v
+                </div>
+                {/* Edit or display */}
+                {isEditing ? (
+                  <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==="Enter") commitEdit(opt); if(e.key==="Escape") setEditIdx(null); }}
+                    style={{flex:1,padding:"5px 9px",border:"1px solid #7c3aed",borderRadius:6,fontFamily:"inherit",fontSize:13,outline:"none"}}/>
+                ) : (
+                  <div style={{flex:1,fontSize:13,color:"#111",wordBreak:"break-word"}}>{opt}</div>
+                )}
+                {/* Actions */}
+                {isEditing ? (
+                  <>
+                    <button onClick={()=>commitEdit(opt)}
+                      style={{padding:"4px 10px",background:"#7c3aed",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>
+                      Save
+                    </button>
+                    <button onClick={()=>setEditIdx(null)}
+                      style={{padding:"4px 8px",background:"#f3f4f6",color:"#6b7280",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={()=>startEdit(opt)}
+                      style={{padding:"4px 10px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
+                      ✏️ Edit
+                    </button>
+                    <button onClick={()=>deleteItem(opt)}
+                      style={{padding:"4px 8px",background:"none",color:"#dc2626",border:"1px solid #fca5a5",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
+                      🗑
+                    </button>
+                  </>
+                )}
               </div>
-              {/* Edit or display */}
-              {editIdx===i ? (
-                <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
-                  onKeyDown={e=>{ if(e.key==="Enter") commitEdit(i); if(e.key==="Escape") setEditIdx(null); }}
-                  style={{flex:1,padding:"5px 9px",border:"1px solid #7c3aed",borderRadius:6,fontFamily:"inherit",fontSize:13,outline:"none"}}/>
-              ) : (
-                <div style={{flex:1,fontSize:13,color:"#111",wordBreak:"break-word"}}>{opt}</div>
-              )}
-              {/* Actions */}
-              {editIdx===i ? (
-                <>
-                  <button onClick={()=>commitEdit(i)}
-                    style={{padding:"4px 10px",background:"#7c3aed",color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>
-                    Save
-                  </button>
-                  <button onClick={()=>setEditIdx(null)}
-                    style={{padding:"4px 8px",background:"#f3f4f6",color:"#6b7280",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={()=>startEdit(i)}
-                    style={{padding:"4px 10px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:500,whiteSpace:"nowrap"}}>
-                    ✏️ Edit
-                  </button>
-                  <button onClick={()=>deleteItem(i)}
-                    style={{padding:"4px 8px",background:"none",color:"#dc2626",border:"1px solid #fca5a5",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12}}>
-                    🗑
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Add new */}
@@ -406,7 +419,7 @@ function VHManagerModal({ options, onClose, onSave }: {
             style={{padding:"8px 18px",background:"#f3f4f6",color:"#374151",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600}}>
             Cancel
           </button>
-          <button onClick={()=>{ onSave(items); onClose(); }}
+          <button onClick={()=>{ onSave(items, renames); onClose(); }}
             style={{padding:"8px 20px",background:"#111",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700}}>
             💾 Save Changes
           </button>
@@ -2559,17 +2572,36 @@ export default function TikTokShopReporter() {
 {showVHManager && (
   <VHManagerModal
     options={visualHookOptions}
+    usageCounts={(() => {
+      const counts: Record<string,number> = {};
+      allTime.forEach(r => { if (r.visualHook) counts[r.visualHook] = (counts[r.visualHook]||0) + 1; });
+      return counts;
+    })()}
     onClose={()=>setShowVHManager(false)}
-    onSave={async (next)=>{
+    onSave={async (next, renames)=>{
       setVisualHookOptions(next);
       supabase.from('tiktok_hub_settings').upsert({
         key: 'visual_hook_options',
         value: JSON.stringify(next),
         updated_at: new Date().toISOString(),
       });
+      // Apply renames: update all videos that had the old hook value
+      if (renames && Object.keys(renames).length > 0) {
+        const renameOps: {report_id:string; visual_hook:string; updated_at:string}[] = [];
+        allTime.forEach(r => {
+          if (r.visualHook && renames[r.visualHook]) {
+            renameOps.push({ report_id: r.videoId, visual_hook: renames[r.visualHook], updated_at: new Date().toISOString() });
+          }
+        });
+        if (renameOps.length > 0) {
+          await supabase.from('tiktok_overrides').upsert(renameOps, { onConflict: 'report_id' });
+          const applyRenames = (rs: VideoRow[]) => rs.map(r => r.visualHook && renames[r.visualHook] ? {...r, visualHook: renames[r.visualHook]} : r);
+          setAllTime(applyRenames); setLastMonth(applyRenames); setInhouse(applyRenames);
+        }
+      }
       // Clear visualHook on any video whose current value isn't in the new list
       const allowed = new Set(next);
-      const toClear = allTime.filter(r => r.visualHook && !allowed.has(r.visualHook));
+      const toClear = allTime.filter(r => r.visualHook && !allowed.has(r.visualHook) && !(renames && renames[r.visualHook]));
       if (toClear.length > 0) {
         const clearOps = toClear.map(row => ({
           report_id: row.videoId,
@@ -2577,7 +2609,6 @@ export default function TikTokShopReporter() {
           updated_at: new Date().toISOString(),
         }));
         await supabase.from('tiktok_overrides').upsert(clearOps, { onConflict: 'report_id' });
-        // Update in-memory state
         const clearIds = new Set(toClear.map(r => r.videoId));
         const clearRow = (rs: VideoRow[]) => rs.map(r => clearIds.has(r.videoId) ? {...r, visualHook:""} : r);
         setAllTime(clearRow); setLastMonth(clearRow); setInhouse(clearRow);
