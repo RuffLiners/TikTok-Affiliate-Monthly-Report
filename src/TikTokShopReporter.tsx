@@ -108,6 +108,19 @@ const lbl = (h: string): string => { const i=h.indexOf(":"); return (i>0&&i<65) 
 const f$  = (v: number): string => "$"+Number(v||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fN  = (v: number): string => Number(v||0).toLocaleString("en-US");
 const fK  = (v: number): string => { const n=Number(v||0); return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(Math.round(n)); };
+// Returns {date:"MM/DD/YYYY", time:"HH:MM"} from an ISO timestamp or date string. time is "" if no time component.
+const fDateTime = (s: string): {date:string; time:string} => {
+  if (!s) return {date:"",time:""};
+  const d = new Date(s.includes('/') ? s.replace(/(\d+)\/(\d+)\/(\d+)/,'$3-$1-$2') : s);
+  if (isNaN(d.getTime())) return {date:s,time:""};
+  const hasTime = s.includes('T') || (s.includes(' ') && s.includes(':'));
+  const mo = String(d.getUTCMonth()+1).padStart(2,'0');
+  const dy = String(d.getUTCDate()).padStart(2,'0');
+  const yr = d.getUTCFullYear();
+  const hh = String(d.getUTCHours()).padStart(2,'0');
+  const mm = String(d.getUTCMinutes()).padStart(2,'0');
+  return {date:`${mo}/${dy}/${yr}`, time: hasTime ? `${hh}:${mm}` : ""};
+};
 
 // Parse a human-typed video length string into total seconds. Returns null if unparseable.
 const parseLengthSecs = (s: string): number | null => {
@@ -472,7 +485,9 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
             <div style={{background:"#111",color:"#fff",borderRadius:7,minWidth:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>#{r.rank}</div>
             <div style={{minWidth:0}}>
               <div style={{fontWeight:700,fontSize:14,color:"#111"}}>@{r.creator}</div>
-              <div style={{fontSize:11,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{shortProduct} · {r.datePosted}</div>
+              <div style={{fontSize:11,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {shortProduct}{r.datePosted ? (() => { const {date,time} = fDateTime(r.datePosted); return <> · {date}{time && <span style={{color:"#6b7280"}}> {time}</span>}</>; })() : null}
+              </div>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -1630,7 +1645,7 @@ export default function TikTokShopReporter() {
                     </span>
                     <span style={{fontWeight:700,color:"#16a34a",fontSize:13}}>{f$(v.revenue)}</span>
                     <span style={{fontSize:11,color:"#9ca3af"}}>{fN(v.itemsSold)} sold</span>
-                    {v.datePosted && <span style={{fontSize:11,color:"#9ca3af"}}>· {v.datePosted}</span>}
+                    {v.datePosted && (() => { const {date,time} = fDateTime(v.datePosted); return <span style={{fontSize:11,color:"#9ca3af"}}>· {date}{time && <span style={{color:"#6b7280"}}> {time}</span>}</span>; })()}
                   </div>
                   {v.videoId ? (
                     <div className="rl-tile-embed" style={{width:325,height:578,overflow:"hidden",borderRadius:10,background:"#0a0a0a"}}>
