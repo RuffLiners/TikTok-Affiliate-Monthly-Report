@@ -486,7 +486,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
             <div style={{minWidth:0}}>
               <div style={{fontWeight:700,fontSize:14,color:"#111"}}>@{r.creator}</div>
               <div style={{fontSize:11,color:"#9ca3af",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {shortProduct}{r.datePosted ? (() => { const {date,time} = fDateTime(r.datePosted); return <> · {date}{time && <span style={{color:"#6b7280"}}> at {time}</span>}</>; })() : null}
+                {shortProduct}
               </div>
             </div>
           </div>
@@ -602,7 +602,7 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
           </div>
         )}
 
-        <div style={{display:"flex",gap:18,padding:"8px 0",borderTop:"1px solid #f3f4f6",borderBottom:"1px solid #f3f4f6"}}>
+        <div style={{display:"flex",gap:18,padding:"8px 0",borderTop:"1px solid #f3f4f6",borderBottom:"1px solid #f3f4f6",flexWrap:"wrap",alignItems:"flex-end"}}>
           {[["👁","Views",fK(r.views)],["❤️","Likes",fK(r.likes)],["💬","Comments",fK(r.comments)]].map(([ic,lb,v])=>(
             <div key={lb as string}>
               <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>{ic} {lb}</div>
@@ -610,11 +610,22 @@ function VideoCard({ r, showFilter, hiddenIds, editingId, adminMode, transcriptO
             </div>
           ))}
           {r.videoLength && (
-            <div>
-              <div style={{fontSize:9,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:1}}>⏱ Length</div>
-              <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{r.videoLength}</div>
+            <div style={{borderLeft:"2px solid #e9d5ff",paddingLeft:14,marginLeft:4}}>
+              <div style={{fontSize:9,color:"#7c3aed",textTransform:"uppercase",letterSpacing:"0.04em",fontWeight:700,marginBottom:1}}>⏱ Length</div>
+              <div style={{fontWeight:800,fontSize:16,color:"#7c3aed"}}>{r.videoLength}</div>
             </div>
           )}
+          {r.datePosted && (() => {
+            const {date, time} = fDateTime(r.datePosted);
+            return (
+              <div style={{borderLeft:"2px solid #fed7aa",paddingLeft:14,marginLeft:4}}>
+                <div style={{fontSize:9,color:"#ea580c",textTransform:"uppercase",letterSpacing:"0.04em",fontWeight:700,marginBottom:1}}>📅 Posted</div>
+                <div style={{fontWeight:700,fontSize:13,color:"#ea580c",lineHeight:1.3}}>
+                  {date}{time && <span style={{display:"block",fontSize:12,fontWeight:600,color:"#f97316"}}>{time}</span>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {r.product && (
