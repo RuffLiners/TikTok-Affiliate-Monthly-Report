@@ -59,6 +59,20 @@ function SetNewPassword({ onDone }: { onDone?: () => void }) {
   )
 }
 
+const RESET_FLAG = 'auth_reset_attempted'
+
+// Clears only local auth/cache state. All report data lives in Supabase, so
+// nothing saved is lost — the user just signs in again.
+function resetLocalAuthAndReload() {
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k))
+    sessionStorage.removeItem('rl_data_v1')
+    sessionStorage.removeItem('ch_data_v1')
+    sessionStorage.setItem(RESET_FLAG, '1')
+  } catch { /* storage unavailable */ }
+  window.location.reload()
+}
+
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,12 +88,15 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
 
     const timeout = setTimeout(() => {
+      // Auto-recover once: wipe the (likely stuck/corrupt) local session and reload.
+      if (!sessionStorage.getItem(RESET_FLAG)) { resetLocalAuthAndReload(); return }
       setTimedOut(true)
       setLoading(false)
-    }, 30000)
+    }, 10000)
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout)
+      sessionStorage.removeItem(RESET_FLAG)
       setSession(session)
       setLoading(false)
     }).catch(() => {
@@ -118,7 +135,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
         <div style={{ color: '#6b7280', fontSize: 13, textAlign: 'center', maxWidth: 320 }}>
           Could not reach the database. Try refreshing, clearing your browser cache, or switching networks. If the problem persists, contact your admin.
         </div>
-        <button onClick={() => window.location.reload()}
+        <button onClick={resetLocalAuthAndReload}
           style={{ padding: '9px 24px', borderRadius: 7, border: 'none', background: '#3b82f6', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
           Retry
         </button>
