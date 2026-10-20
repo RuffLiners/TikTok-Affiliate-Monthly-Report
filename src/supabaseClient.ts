@@ -11,4 +11,10 @@ const effectiveUrl =
     ? `${window.location.origin}/api/sb`
     : supabaseUrl
 
-export const supabase = createClient(effectiveUrl, supabaseAnonKey)
+export const supabase = createClient(effectiveUrl, supabaseAnonKey, {
+  auth: {
+    // A stuck/orphaned browser lock (other tab, crashed tab, debugger) makes
+    // getSession() hang forever. Skip the cross-tab lock and just run the fn.
+    lock: async (_name, _acquireTimeout, fn) => await fn(),
+  },
+})
