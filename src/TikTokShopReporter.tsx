@@ -758,6 +758,10 @@ export default function TikTokShopReporter() {
   const [draftLm,   setDraftLm]   = useState<number|"">("");
   const [draftCr,   setDraftCr]   = useState<number|"">("");
   // One min total GMV cutoff shared by all Hooks and CTAs to be listed on the Hooks tab (0 = no cutoff)
+  // Min GMV filter for the In-House High GMV tab (0 = no filter); its own setting, separate from All-Time / Last Month
+  const [savedIh,   setSavedIh]   = useState(0);
+  const [draftIh,   setDraftIh]   = useState<number|"">("");
+  const [pubIh,     setPubIh]     = useState(0);
   const [savedHk,   setSavedHk]   = useState(DEFAULT_HOOK_MIN_GMV);
   const [draftHk,   setDraftHk]   = useState<number|"">(DEFAULT_HOOK_MIN_GMV);
   const [pubHk,     setPubHk]     = useState(DEFAULT_HOOK_MIN_GMV);
@@ -847,6 +851,7 @@ export default function TikTokShopReporter() {
         setSavedLm(c.slm||0); setDraftLm(c.slm||"");
         setSavedCr(c.scr||0); setDraftCr(c.scr||"");
         setPubAt(c.npat||0); setPubLm(c.nplm||0); setPubCr(c.npcr||0);
+        setSavedIh(c.sih||0); setDraftIh(c.sih||""); setPubIh(c.pih||0);
         { const hk=c.shk??DEFAULT_HOOK_MIN_GMV;
           setSavedHk(hk); setDraftHk(hk||""); setPubHk(c.phk??DEFAULT_HOOK_MIN_GMV); }
         setLastImported(c.li||"");
@@ -906,7 +911,7 @@ export default function TikTokShopReporter() {
       setHiddenIds(hiddenSet);
 
       let sat=0, slm=0, scr=0, npat=0, nplm=0, npcr=0, phid: string[]=[], li="";
-      let shk=DEFAULT_HOOK_MIN_GMV, nphk=DEFAULT_HOOK_MIN_GMV;
+      let shk=DEFAULT_HOOK_MIN_GMV, nphk=DEFAULT_HOOK_MIN_GMV, sih=0, npih=0;
       settings?.forEach((s: {key:string, value:string}) => {
         const n = Number(s.value) || 0;
         if (s.key === 'filter_at') { sat=n; setSavedAt(n); setDraftAt(n || ""); }
@@ -915,6 +920,8 @@ export default function TikTokShopReporter() {
         if (s.key === 'pub_filter_at') { npat=n; setPubAt(n); }
         if (s.key === 'pub_filter_lm') { nplm=n; setPubLm(n); }
         if (s.key === 'pub_filter_cr') { npcr=n; setPubCr(n); }
+        if (s.key === 'filter_ih') { sih=n; setSavedIh(n); setDraftIh(n || ""); }
+        if (s.key === 'pub_filter_ih') { npih=n; setPubIh(n); }
         if (s.key === 'filter_hk') { shk=n; setSavedHk(n); setDraftHk(n || ""); }
         if (s.key === 'pub_filter_hk') { nphk=n; setPubHk(n); }
         if (s.key === 'pub_hidden_ids') { try { phid=JSON.parse(s.value); setPubHiddenIds(new Set(phid)); } catch {} }
@@ -1001,7 +1008,7 @@ export default function TikTokShopReporter() {
           phid,
           omap: Array.from(newMap.entries()),
           sat, slm, scr, npat, nplm, npcr, li,
-          shk, phk: nphk,
+          shk, phk: nphk, sih, pih: npih,
           atAgg: atAggVal, pubAtAgg: pubAtAggVal,
         }));
       } catch {}
@@ -1077,8 +1084,12 @@ export default function TikTokShopReporter() {
   );
 
   const visInhouse = useMemo(
-    () => adminMode ? inhouse : pubInhouse.filter(v => !pubHiddenIds.has(v.videoId)),
-    [inhouse, adminMode, pubInhouse, pubHiddenIds]
+    () => {
+      if (adminMode) return savedIh > 0 ? inhouse.filter(v => v.revenue >= savedIh) : inhouse;
+      const base = pubInhouse.filter(v => !pubHiddenIds.has(v.videoId));
+      return pubIh > 0 ? base.filter(v => v.revenue >= pubIh) : base;
+    },
+    [inhouse, adminMode, savedIh, pubInhouse, pubHiddenIds, pubIh]
   );
 
   const filteredCreators = useMemo(() => {
@@ -1271,6 +1282,8 @@ export default function TikTokShopReporter() {
   const saveFilterCr = async () => { const n=Math.max(0,Number(draftCr)||0); setSavedCr(n); setDraftCr(n||""); await persistSetting('filter_cr',n); };
   const clearFilterAt = () => { setSavedAt(0); setDraftAt(""); setPageAt(20); persistSetting('filter_at',0); };
   const clearFilterLm = () => { setSavedLm(0); setDraftLm(""); setPageLm(20); persistSetting('filter_lm',0); };
+  const saveFilterIh = async () => { const n=Math.max(0,Number(draftIh)||0); setSavedIh(n); setDraftIh(n||""); await persistSetting('filter_ih',n); };
+  const clearFilterIh = () => { setSavedIh(0); setDraftIh(""); persistSetting('filter_ih',0); };
   const clearFilterCr = () => { setSavedCr(0); setDraftCr(""); persistSetting('filter_cr',0); };
   // Hook/CTA cutoff defaults to DEFAULT_HOOK_MIN_GMV, so 0 ("no cutoff") must be stored explicitly rather than deleted
   const persistHookCutoff = (key: string, n: number) =>
@@ -1332,6 +1345,7 @@ export default function TikTokShopReporter() {
       { key: 'pub_filter_at', value: String(savedAt), updated_at: now },
       { key: 'pub_filter_lm', value: String(savedLm), updated_at: now },
       { key: 'pub_filter_cr', value: String(savedCr), updated_at: now },
+      { key: 'pub_filter_ih', value: String(savedIh), updated_at: now },
       { key: 'pub_filter_hk', value: String(savedHk), updated_at: now },
       { key: 'pub_hidden_ids', value: hiddenArr, updated_at: now },
       { key: 'pub_tab_visibility', value: JSON.stringify(tabVisibility), updated_at: now },
@@ -1345,6 +1359,7 @@ export default function TikTokShopReporter() {
     setPubAt(savedAt);
     setPubLm(savedLm);
     setPubCr(savedCr);
+    setPubIh(savedIh);
     setPubHk(savedHk);
     setPubHiddenIds(new Set(hiddenIds));
     setPublishing(false);
@@ -2373,9 +2388,38 @@ export default function TikTokShopReporter() {
         )}
 
         {tab==="inhouse" && (
-          visInhouse.length===0
-            ? <Empty msg="In-House Content report source TBD — upload when available"/>
-            : <div className="rl-two-col">{visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)}</div>
+          <>
+            <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap",background:"#fff",border:"1px solid #e5e7eb",borderRadius:12,padding:"10px 16px",marginBottom:16,fontSize:12,color:"#6b7280"}}>
+              <span style={{color:"#9ca3af"}}><b style={{color:"#111"}}>{visInhouse.length}</b> videos</span>
+              <span style={{color:"#9ca3af"}}>GMV: <b style={{color:"#16a34a"}}>{f$(visInhouse.reduce((s,r)=>s+r.revenue,0))}</b></span>
+              {adminMode && (
+                <span style={{marginLeft:"auto",display:"inline-flex",alignItems:"center",gap:8}}>
+                  Min GMV:
+                  <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
+                    <span style={{color:"#9ca3af"}}>$</span>
+                    <input type="number" min="0" step="1" value={draftIh} placeholder="0"
+                      onChange={e=>setDraftIh(e.target.value as unknown as number)}
+                      onKeyDown={e=>e.key==="Enter"&&saveFilterIh()}
+                      style={{width:100,padding:"4px 8px",border:`1px solid ${Number(draftIh||0)!==savedIh?"#f59e0b":"#d1d5db"}`,borderRadius:6,fontFamily:"inherit",fontSize:12,color:"#111",outline:"none"}}/>
+                  </span>
+                  <button onClick={saveFilterIh}
+                    style={{padding:"4px 12px",background:Number(draftIh||0)!==savedIh?"#111":"#f3f4f6",color:Number(draftIh||0)!==savedIh?"#fff":"#9ca3af",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,transition:"all .15s"}}>
+                    Save
+                  </button>
+                  {savedIh>0&&<button onClick={clearFilterIh} style={{fontSize:11,color:"#9ca3af",background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit"}}>Clear</button>}
+                </span>
+              )}
+            </div>
+            {(adminMode ? savedIh : pubIh)>0 && (
+              <div style={{background:"#111",borderRadius:10,padding:"9px 16px",display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                <span style={{fontSize:14}}>🎬</span>
+                <span style={{color:"#fff",fontSize:13,fontWeight:600}}>In-House Videos with GMV &ge; {f$(adminMode ? savedIh : pubIh)}</span>
+              </div>
+            )}
+            {visInhouse.length===0
+              ? <Empty msg={(adminMode ? savedIh : pubIh)>0 ? "No in-house videos at or above this GMV" : "In-House Content report source TBD — upload when available"}/>
+              : <div className="rl-two-col">{visInhouse.map(r=><VideoCard key={r.id} r={r} showFilter={false} {...cardProps}/>)}</div>}
+          </>
         )}
 
         {tab==="creators" && (
