@@ -274,7 +274,7 @@ function PageManagerModal({ visibility, onClose, onSave }: {
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#9ca3af",padding:"0 4px"}}>✕</button>
         </div>
         <div style={{padding:"8px 24px 4px"}}>
-          <div style={{fontSize:12,color:"#6b7280",padding:"12px 0 8px"}}>Toggle pages on or off to control which pages creators see. Changes go live when you click <strong>Update Dashboard</strong>.</div>
+          <div style={{fontSize:12,color:"#6b7280",padding:"12px 0 8px"}}>Toggle pages on or off to control which pages creators see. Changes go live as soon as you click <strong>Save</strong>. You will still see every page in admin mode.</div>
         </div>
         <div style={{padding:"0 24px 16px",display:"flex",flexDirection:"column",gap:10}}>
           {INSIGHT_TABS_LOCAL.map(t => (
@@ -2663,8 +2663,14 @@ export default function TikTokShopReporter() {
     visibility={tabVisibility}
     onClose={()=>setShowPageManager(false)}
     onSave={(next)=>{
+      // Page visibility goes live for creators immediately (no Update Dashboard needed)
       setTabVisibility(next);
-      supabase.from('tiktok_hub_settings').upsert({key:'tab_visibility',value:JSON.stringify(next),updated_at:new Date().toISOString()});
+      setPubTabVisibility({...next});
+      const now = new Date().toISOString();
+      supabase.from('tiktok_hub_settings').upsert([
+        {key:'tab_visibility',value:JSON.stringify(next),updated_at:now},
+        {key:'pub_tab_visibility',value:JSON.stringify(next),updated_at:now},
+      ]).then(({error}) => { if (error) { console.error('page visibility save failed:', error); alert('Could not save page visibility: ' + error.message); } });
     }}
   />
 )}
