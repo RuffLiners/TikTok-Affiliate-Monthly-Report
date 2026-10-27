@@ -2404,7 +2404,7 @@ export default function TikTokShopReporter() {
                 {label}:
                 <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
                   <span style={{color:"#9ca3af"}}>$</span>
-                  <input type="number" min="0" step="5000" value={draft} placeholder="0"
+                  <input type="number" min="0" step="1" value={draft} placeholder="0"
                     onChange={e=>setDraft(e.target.value as unknown as number)}
                     onKeyDown={e=>e.key==="Enter"&&save()}
                     style={{width:100,padding:"4px 8px",border:`1px solid ${Number(draft||0)!==saved?"#f59e0b":"#d1d5db"}`,borderRadius:6,fontFamily:"inherit",fontSize:12,color:"#111",outline:"none"}}/>
