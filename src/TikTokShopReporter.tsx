@@ -244,7 +244,8 @@ const INSIGHT_TABS = [
   {id:"products",    label:"Product Breakdown",   icon:"🛍", desc:"GMV, units, and top videos broken down by product"},
   {id:"patterns",    label:"Posting Patterns",    icon:"📅", desc:"GMV distribution by day of week, video length, and time of day"},
 ];
-const DEFAULT_TAB_VIS: Record<string,boolean> = {products:false,patterns:false};
+// Core pages default to visible so existing creator dashboards don't change; insight pages default to hidden
+const DEFAULT_TAB_VIS: Record<string,boolean> = {alltime:true,lastmonth:true,inhouse:true,creators:true,hooks:true,products:false,patterns:false};
 
 // ─── PAGE MANAGER MODAL ──────────────────────────────────────────────────────
 
@@ -256,19 +257,24 @@ function PageManagerModal({ visibility, onClose, onSave }: {
   const [vis, setVis] = React.useState({...visibility});
   const toggle = (id: string) => setVis(v => ({...v,[id]:!v[id]}));
   const INSIGHT_TABS_LOCAL = [
+    {id:"alltime",     label:"🏆 All-Time High GMV",   desc:"Top videos by lifetime GMV"},
+    {id:"lastmonth",   label:"📅 Last Month High GMV", desc:"Top videos from last month"},
+    {id:"inhouse",     label:"🎬 In-House High GMV",   desc:"Top in-house content videos"},
+    {id:"creators",    label:"⭐ Top Creators",        desc:"Creators ranked by total GMV"},
+    {id:"hooks",       label:"🪝 Hooks, CTA & Selling Points", desc:"Hooks, calls to action and selling points above the GMV cutoff"},
     {id:"products",    label:"🛍 Product Breakdown",   desc:"GMV, units, and top videos by product ($1K+ GMV only)"},
     {id:"patterns",    label:"📅 Posting Patterns",    desc:"GMV by day of week, video length, and time of day"},
   ];
   return (
     <div onClick={e=>{if(e.target===e.currentTarget)onClose();}}
       style={{position:"fixed",inset:0,zIndex:3000,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",display:"flex",flexDirection:"column"}}>
         <div style={{padding:"20px 24px 16px",borderBottom:"1px solid #e5e7eb",display:"flex",alignItems:"center",gap:10}}>
           <div style={{fontWeight:800,fontSize:16,color:"#111",flex:1}}>📋 Manage Creator Pages</div>
           <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#9ca3af",padding:"0 4px"}}>✕</button>
         </div>
         <div style={{padding:"8px 24px 4px"}}>
-          <div style={{fontSize:12,color:"#6b7280",padding:"12px 0 8px"}}>Toggle pages on to include them in the creator dashboard. Changes go live when you click <strong>Update Dashboard</strong>.</div>
+          <div style={{fontSize:12,color:"#6b7280",padding:"12px 0 8px"}}>Toggle pages on or off to control which pages creators see. Changes go live when you click <strong>Update Dashboard</strong>.</div>
         </div>
         <div style={{padding:"0 24px 16px",display:"flex",flexDirection:"column",gap:10}}>
           {INSIGHT_TABS_LOCAL.map(t => (
@@ -801,6 +807,13 @@ export default function TikTokShopReporter() {
   const [tabVisibility, setTabVisibility] = useState<Record<string,boolean>>({...DEFAULT_TAB_VIS});
   const [pubTabVisibility, setPubTabVisibility] = useState<Record<string,boolean>>({...DEFAULT_TAB_VIS});
   const [showPageManager, setShowPageManager] = useState(false);
+
+  // Creators: if the current page isn't visible to them, land on the first page that is
+  useEffect(() => {
+    if (adminMode || pubTabVisibility[tab]) return;
+    const first = [...TABS, ...INSIGHT_TABS].find(t => pubTabVisibility[t.id]);
+    if (first) setTab(first.id);
+  }, [adminMode, tab, pubTabVisibility]);
 
   // ── initial load from Supabase ──────────────────────────────────────────────
 
@@ -2215,7 +2228,7 @@ export default function TikTokShopReporter() {
         <input ref={xlsxImportRef} type="file" accept=".xlsx" style={{display:"none"}} onChange={e=>{ const f=e.target.files?.[0]; if(f) importXLSX(f); e.target.value=''; }}/>
 
         <div className="rl-tabs" style={{display:"flex",overflowX:"auto"}}>
-          {TABS.map(t=>{
+          {TABS.filter(t => adminMode || pubTabVisibility[t.id]).map(t=>{
             const active=tab===t.id;
             return (
               <button key={t.id} onClick={()=>setTab(t.id)}
@@ -2224,6 +2237,9 @@ export default function TikTokShopReporter() {
                 <span style={{background:active?"rgba(255,255,255,0.14)":"rgba(255,255,255,0.08)",color:active?"#fff":"#90a4b4",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>
                   {tabCount[t.id as keyof typeof tabCount]}
                 </span>
+                {adminMode && !pubTabVisibility[t.id] && (
+                  <span style={{background:"#6b7280",color:"#fff",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700,letterSpacing:"0.05em"}}>HIDDEN</span>
+                )}
               </button>
             );
           })}
