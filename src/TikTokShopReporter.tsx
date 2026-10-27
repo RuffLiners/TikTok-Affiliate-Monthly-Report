@@ -757,13 +757,10 @@ export default function TikTokShopReporter() {
   const [draftAt,   setDraftAt]   = useState<number|"">("");
   const [draftLm,   setDraftLm]   = useState<number|"">("");
   const [draftCr,   setDraftCr]   = useState<number|"">("");
-  // Min total GMV for a Hook / CTA to be listed on the Hooks tab (0 = no cutoff)
+  // One min total GMV cutoff shared by all Hooks and CTAs to be listed on the Hooks tab (0 = no cutoff)
   const [savedHk,   setSavedHk]   = useState(DEFAULT_HOOK_MIN_GMV);
-  const [savedCta,  setSavedCta]  = useState(DEFAULT_HOOK_MIN_GMV);
   const [draftHk,   setDraftHk]   = useState<number|"">(DEFAULT_HOOK_MIN_GMV);
-  const [draftCta,  setDraftCta]  = useState<number|"">(DEFAULT_HOOK_MIN_GMV);
   const [pubHk,     setPubHk]     = useState(DEFAULT_HOOK_MIN_GMV);
-  const [pubCta,    setPubCta]    = useState(DEFAULT_HOOK_MIN_GMV);
   const [overridesMap, setOverridesMap] = useState<Map<string, Override>>(new Map());
   const localOverridesRef = useRef<Map<string, Override>>(new Map());
   const [dataLoading, setDataLoading] = useState(true);
@@ -850,9 +847,8 @@ export default function TikTokShopReporter() {
         setSavedLm(c.slm||0); setDraftLm(c.slm||"");
         setSavedCr(c.scr||0); setDraftCr(c.scr||"");
         setPubAt(c.npat||0); setPubLm(c.nplm||0); setPubCr(c.npcr||0);
-        { const hk=c.shk??DEFAULT_HOOK_MIN_GMV, ct=c.sct??DEFAULT_HOOK_MIN_GMV;
-          setSavedHk(hk); setDraftHk(hk||""); setSavedCta(ct); setDraftCta(ct||"");
-          setPubHk(c.phk??DEFAULT_HOOK_MIN_GMV); setPubCta(c.pct??DEFAULT_HOOK_MIN_GMV); }
+        { const hk=c.shk??DEFAULT_HOOK_MIN_GMV;
+          setSavedHk(hk); setDraftHk(hk||""); setPubHk(c.phk??DEFAULT_HOOK_MIN_GMV); }
         setLastImported(c.li||"");
         if (c.atAgg) setAtAgg(c.atAgg);
         if (c.pubAtAgg) setPubAtAgg(c.pubAtAgg);
@@ -910,7 +906,7 @@ export default function TikTokShopReporter() {
       setHiddenIds(hiddenSet);
 
       let sat=0, slm=0, scr=0, npat=0, nplm=0, npcr=0, phid: string[]=[], li="";
-      let shk=DEFAULT_HOOK_MIN_GMV, sct=DEFAULT_HOOK_MIN_GMV, nphk=DEFAULT_HOOK_MIN_GMV, npct=DEFAULT_HOOK_MIN_GMV;
+      let shk=DEFAULT_HOOK_MIN_GMV, nphk=DEFAULT_HOOK_MIN_GMV;
       settings?.forEach((s: {key:string, value:string}) => {
         const n = Number(s.value) || 0;
         if (s.key === 'filter_at') { sat=n; setSavedAt(n); setDraftAt(n || ""); }
@@ -920,9 +916,7 @@ export default function TikTokShopReporter() {
         if (s.key === 'pub_filter_lm') { nplm=n; setPubLm(n); }
         if (s.key === 'pub_filter_cr') { npcr=n; setPubCr(n); }
         if (s.key === 'filter_hk') { shk=n; setSavedHk(n); setDraftHk(n || ""); }
-        if (s.key === 'filter_cta') { sct=n; setSavedCta(n); setDraftCta(n || ""); }
         if (s.key === 'pub_filter_hk') { nphk=n; setPubHk(n); }
-        if (s.key === 'pub_filter_cta') { npct=n; setPubCta(n); }
         if (s.key === 'pub_hidden_ids') { try { phid=JSON.parse(s.value); setPubHiddenIds(new Set(phid)); } catch {} }
         if (s.key === 'last_imported') { li=s.value; setLastImported(s.value); }
         // ov_VIDEOID keys are override backups written by saveEdit
@@ -1007,7 +1001,7 @@ export default function TikTokShopReporter() {
           phid,
           omap: Array.from(newMap.entries()),
           sat, slm, scr, npat, nplm, npcr, li,
-          shk, sct, phk: nphk, pct: npct,
+          shk, phk: nphk,
           atAgg: atAggVal, pubAtAgg: pubAtAggVal,
         }));
       } catch {}
@@ -1182,11 +1176,10 @@ export default function TikTokShopReporter() {
   // reflected without waiting for a CSV re-upload or atAgg recompute.
   const src = adminMode ? allTime : pubAllTime;
   const hookMinGmv = adminMode ? savedHk  : pubHk;
-  const ctaMinGmv  = adminMode ? savedCta : pubCta;
   const topVisualHooks   = useMemo(() => buildTopHooks(src, 'visualHook', hookMinGmv),  [src, hookMinGmv]); // eslint-disable-line react-hooks/exhaustive-deps
   const topTextHooks     = useMemo(() => buildTopHooks(src, 'textHook', hookMinGmv),    [src, hookMinGmv]); // eslint-disable-line react-hooks/exhaustive-deps
   const topAudioHooks    = useMemo(() => buildTopAudioHooks(src, hookMinGmv),           [src, hookMinGmv]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topCTAs          = useMemo(() => buildTopHooks(src, 'cta', ctaMinGmv),          [src, ctaMinGmv]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topCTAs          = useMemo(() => buildTopHooks(src, 'cta', hookMinGmv),          [src, hookMinGmv]); // eslint-disable-line react-hooks/exhaustive-deps
   const topSellingPoints = useMemo(() => buildTopSellingPoints(src),        [src]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Insight page data ────────────────────────────────────────────────────────
@@ -1279,11 +1272,10 @@ export default function TikTokShopReporter() {
   const clearFilterAt = () => { setSavedAt(0); setDraftAt(""); setPageAt(20); persistSetting('filter_at',0); };
   const clearFilterLm = () => { setSavedLm(0); setDraftLm(""); setPageLm(20); persistSetting('filter_lm',0); };
   const clearFilterCr = () => { setSavedCr(0); setDraftCr(""); persistSetting('filter_cr',0); };
-  // Hook/CTA cutoffs default to DEFAULT_HOOK_MIN_GMV, so 0 ("no cutoff") must be stored explicitly rather than deleted
+  // Hook/CTA cutoff defaults to DEFAULT_HOOK_MIN_GMV, so 0 ("no cutoff") must be stored explicitly rather than deleted
   const persistHookCutoff = (key: string, n: number) =>
     supabase.from('tiktok_hub_settings').upsert({ key, value: String(n), updated_at: new Date().toISOString() });
   const saveFilterHk  = async () => { const n=Math.max(0,Number(draftHk)||0);  setSavedHk(n);  setDraftHk(n||"");  await persistHookCutoff('filter_hk',n); };
-  const saveFilterCta = async () => { const n=Math.max(0,Number(draftCta)||0); setSavedCta(n); setDraftCta(n||""); await persistHookCutoff('filter_cta',n); };
 
   const publishDashboard = async () => {
     setPublishing(true);
@@ -1341,7 +1333,6 @@ export default function TikTokShopReporter() {
       { key: 'pub_filter_lm', value: String(savedLm), updated_at: now },
       { key: 'pub_filter_cr', value: String(savedCr), updated_at: now },
       { key: 'pub_filter_hk', value: String(savedHk), updated_at: now },
-      { key: 'pub_filter_cta', value: String(savedCta), updated_at: now },
       { key: 'pub_hidden_ids', value: hiddenArr, updated_at: now },
       { key: 'pub_tab_visibility', value: JSON.stringify(tabVisibility), updated_at: now },
     ]);
@@ -1355,7 +1346,6 @@ export default function TikTokShopReporter() {
     setPubLm(savedLm);
     setPubCr(savedCr);
     setPubHk(savedHk);
-    setPubCta(savedCta);
     setPubHiddenIds(new Set(hiddenIds));
     setPublishing(false);
     sessionStorage.removeItem('rl_data_v1');
@@ -2396,25 +2386,20 @@ export default function TikTokShopReporter() {
 
         {tab==="hooks" && adminMode && (
           <div style={{display:"flex",gap:24,alignItems:"center",flexWrap:"wrap",background:"#fff",border:"1px solid #e5e7eb",borderRadius:12,padding:"10px 16px",marginBottom:16,fontSize:12,color:"#6b7280"}}>
-            {([
-              ["Min Hook GMV", draftHk, setDraftHk, savedHk, saveFilterHk],
-              ["Min CTA GMV",  draftCta, setDraftCta, savedCta, saveFilterCta],
-            ] as [string, number|"", (v:number|"")=>void, number, ()=>void][]).map(([label,draft,setDraft,saved,save])=>(
-              <span key={label} style={{display:"inline-flex",alignItems:"center",gap:8}}>
-                {label}:
-                <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
-                  <span style={{color:"#9ca3af"}}>$</span>
-                  <input type="number" min="0" step="1" value={draft} placeholder="0"
-                    onChange={e=>setDraft(e.target.value as unknown as number)}
-                    onKeyDown={e=>e.key==="Enter"&&save()}
-                    style={{width:100,padding:"4px 8px",border:`1px solid ${Number(draft||0)!==saved?"#f59e0b":"#d1d5db"}`,borderRadius:6,fontFamily:"inherit",fontSize:12,color:"#111",outline:"none"}}/>
-                </span>
-                <button onClick={save}
-                  style={{padding:"4px 12px",background:Number(draft||0)!==saved?"#111":"#f3f4f6",color:Number(draft||0)!==saved?"#fff":"#9ca3af",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,transition:"all .15s"}}>
-                  Save
-                </button>
+            <span style={{display:"inline-flex",alignItems:"center",gap:8}}>
+              Min GMV for Hooks &amp; CTAs:
+              <span style={{display:"inline-flex",alignItems:"center",gap:2}}>
+                <span style={{color:"#9ca3af"}}>$</span>
+                <input type="number" min="0" step="1" value={draftHk} placeholder="0"
+                  onChange={e=>setDraftHk(e.target.value as unknown as number)}
+                  onKeyDown={e=>e.key==="Enter"&&saveFilterHk()}
+                  style={{width:100,padding:"4px 8px",border:`1px solid ${Number(draftHk||0)!==savedHk?"#f59e0b":"#d1d5db"}`,borderRadius:6,fontFamily:"inherit",fontSize:12,color:"#111",outline:"none"}}/>
               </span>
-            ))}
+              <button onClick={saveFilterHk}
+                style={{padding:"4px 12px",background:Number(draftHk||0)!==savedHk?"#111":"#f3f4f6",color:Number(draftHk||0)!==savedHk?"#fff":"#9ca3af",border:"none",borderRadius:6,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,transition:"all .15s"}}>
+                Save
+              </button>
+            </span>
             <span style={{fontSize:11,color:"#9ca3af"}}>Set to 0 to show everything with GMV. Publish to apply on the public dashboard.</span>
           </div>
         )}
@@ -2439,12 +2424,12 @@ export default function TikTokShopReporter() {
                 <div>
                   <div style={{marginBottom:8}}>
                     <div style={{fontWeight:900,fontSize:22,color:"#111",marginBottom:2}}>📣 Call to Action</div>
-                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>{ctaMinGmv>0?`All CTAs with total GMV ≥ ${f$(ctaMinGmv)}`:"All CTAs"}, ranked by cumulative GMV across all all-time videos</div>
+                    <div style={{fontSize:12,color:"#9ca3af",marginBottom:20}}>{hookMinGmv>0?`All CTAs with total GMV ≥ ${f$(hookMinGmv)}`:"All CTAs"}, ranked by cumulative GMV across all all-time videos</div>
                   </div>
                   {topCTAs.length>0
-                    ? <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626" minGmv={ctaMinGmv}/>
+                    ? <HookSection hooks={topCTAs} icon="📣" title="Top CTAs" accent="#dc2626" minGmv={hookMinGmv}/>
                     : <div style={{background:"#fff",borderRadius:12,border:"1px dashed #d1d5db",padding:"28px 20px",textAlign:"center",marginBottom:28,color:"#9ca3af",fontSize:13}}>
-                        No CTAs{ctaMinGmv>0?` with total GMV ≥ ${f$(ctaMinGmv)}`:""} yet — edit videos and fill in the <strong style={{color:"#374151"}}>Call to Action</strong> field to see top CTAs here.
+                        No CTAs{hookMinGmv>0?` with total GMV ≥ ${f$(hookMinGmv)}`:""} yet — edit videos and fill in the <strong style={{color:"#374151"}}>Call to Action</strong> field to see top CTAs here.
                       </div>
                   }
                   {topSellingPoints.length>0 && (
